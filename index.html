@@ -106,7 +106,9 @@
       <button class="part-btn" data-model="2x4_L_Shaped_Beam.glb">Brick 1</button>
       <button class="part-btn" data-model="3x3_T_Beam.glb">Brick</button>
       <button class="part-btn" data-model="3x3_Triangle_With_3_Axle_Hole.glb">Wheel</button>
-            <button class="part-btn" data-model="peg.glb">peg</button>
+      <button class="part-btn" data-model="peg.glb">peg</button>
+      <button class="part-btn" data-model="Beam_5.glb">Beam_5</button>
+      <button class="part-btn" data-model="Beam_7.glb">Beam_7</button>
     </div>
     
     <button id="saveBtn" style="position:absolute; top:10px; right:10px; z-index:10; padding:8px 12px; border:none; border-radius:6px; background:#2d89ef; color:white; font-weight:bold; cursor:pointer;">Save JSON</button>
@@ -260,7 +262,7 @@
       let showCollisionDebug = false;
       let collisionEnabled = true;
 
-      class RigidBody {
+ class RigidBody {
         constructor(object) {
           this.object = object;
           this.boundingBox = new THREE.Box3();
@@ -273,10 +275,8 @@
 
         extractMeshGeometry() {
           this.meshGeometries = [];
-          
           this.object.traverse((child) => {
             if (child.isMesh && child.geometry) {
-              // Store reference to the actual mesh and its geometry
               this.meshGeometries.push({
                 mesh: child,
                 geometry: child.geometry.clone(),
@@ -288,70 +288,49 @@
 
         createDebugVisualization() {
           this.removeDebugVisualization();
-          
           if (!this.showDebug) return;
-          
-          // Create wireframe versions of all meshes in the object
+
+          this.debugMesh = [];
+
           this.object.traverse((child) => {
             if (child.isMesh && child.geometry) {
-              // Create wireframe geometry from the actual mesh
-              const wireframeGeometry = new THREE.WireframeGeometry(child.geometry);
-              const wireframeMaterial = new THREE.LineBasicMaterial({
+              const wfGeo = new THREE.WireframeGeometry(child.geometry);
+              const wfMat = new THREE.LineBasicMaterial({
                 color: 0x00ff00,
                 transparent: true,
-                opacity: 0.8,
-                linewidth: 2
+                opacity: 0.8
               });
-              
-              const wireframe = new THREE.LineSegments(wireframeGeometry, wireframeMaterial);
-              
-              // Copy transform from the original mesh
-              wireframe.position.copy(child.position);
-              wireframe.rotation.copy(child.rotation);
-              wireframe.scale.copy(child.scale);
-              wireframe.matrix.copy(child.matrix);
-              wireframe.matrixWorld.copy(child.matrixWorld);
-              
-              // Add wireframe as child of the main object so it follows automatically
-              child.add(wireframe);
-              
-              // Store reference for cleanup
-              if (!this.debugMesh) this.debugMesh = [];
-              this.debugMesh.push(wireframe);
+              const wf = new THREE.LineSegments(wfGeo, wfMat);
+              wf.name = '__rb_debug__';
+
+              // Parent to mesh so it inherits transform
+              child.add(wf);
+
+              this.debugMesh.push(wf);
             }
           });
         }
 
         removeDebugVisualization() {
-          if (this.debugMesh) {
-            if (Array.isArray(this.debugMesh)) {
-              this.debugMesh.forEach(mesh => {
-                if (mesh.parent) {
-                  mesh.parent.remove(mesh);
-                }
-              });
-            } else {
-              if (this.debugMesh.parent) {
-                this.debugMesh.parent.remove(this.debugMesh);
-              }
+          if (Array.isArray(this.debugMesh)) {
+            for (const wf of this.debugMesh) {
+              if (wf.parent) wf.parent.remove(wf);
+              wf.geometry?.dispose?.();
+              wf.material?.dispose?.();
             }
-            this.debugMesh = null;
           }
+          this.debugMesh = null;
         }
 
         updateBoundingBox() {
           this.object.updateMatrixWorld(true);
           this.boundingBox.setFromObject(this.object);
-          // Debug visualization will automatically follow since it's a child of the object
         }
 
         toggleDebugVisualization() {
           this.showDebug = !this.showDebug;
-          if (this.showDebug) {
-            this.createDebugVisualization();
-          } else {
-            this.removeDebugVisualization();
-          }
+          if (this.showDebug) this.createDebugVisualization();
+          else this.removeDebugVisualization();
         }
 
         // Check collision using raycasting against actual mesh geometry
@@ -492,64 +471,55 @@
         updateSelection();
       }
 
-      function resolveGrabbedCollisions() {
-        if (!currentGrabbed || !collisionEnabled) return;
+function resolveGrabbedCollisions() {
+  if (!currentGrabbed || !collisionEnabled) return;
 
-        const grabbedBody = rigidBodies.find(b => b.object === currentGrabbed);
-        if (!grabbedBody) return;
+  const grabbedBody = rigidBodies.find(b => b.object === currentGrabbed);
+  if (!grabbedBody) return;
 
-        grabbedBody.updateBoundingBox();
+  grabbedBody.updateBoundingBox();
 
-        // Ground collision
-        const minY = grabbedBody.boundingBox.min.y;
-        const groundY = 0;
-        if (minY < groundY) {
-          const offset = groundY - minY;
-          currentGrabbed.position.y += offset;
-          grabbedBody.updateBoundingBox();
-        }
+  // Ground collision
+  const minY = grabbedBody.boundingBox.min.y;
+  if (minY < 0) {
+    currentGrabbed.position.y += -minY;
+    grabbedBody.updateBoundingBox();
+  }
 
-        // Object collisions - simplified approach
-        for (let other of rigidBodies) {
-          if (other.object === currentGrabbed) continue;
+  // Object collisions
+  for (let other of rigidBodies) {
+    if (other.object === currentGrabbed) continue;
 
-          if (grabbedBody.checkCollisionWith(other)) {
-            // Simple push-away collision resolution
-            const thisBox = grabbedBody.boundingBox;
-            const otherBox = other.boundingBox;
+    if (grabbedBody.boundingBox.intersectsBox(other.boundingBox)) {
+      const thisBox = grabbedBody.boundingBox;
+      const otherBox = other.boundingBox;
 
-            const thisCenter = thisBox.getCenter(new THREE.Vector3());
-            const otherCenter = otherBox.getCenter(new THREE.Vector3());
-            
-            // Calculate push direction
-            const pushDirection = thisCenter.clone().sub(otherCenter).normalize();
-            
-            // If direction is too small, use default direction
-            if (pushDirection.length() < 0.1) {
-              pushDirection.set(1, 0, 0);
-            }
-            
-            // Calculate minimum separation distance
-            const thisSize = thisBox.getSize(new THREE.Vector3());
-            const otherSize = otherBox.getSize(new THREE.Vector3());
-            const minDistance = Math.max(thisSize.length(), otherSize.length()) * 0.6;
-            
-            // Push object away
-            const targetPos = otherCenter.clone().add(pushDirection.multiplyScalar(minDistance));
-            const displacement = targetPos.sub(thisCenter);
-            
-            currentGrabbed.position.add(displacement);
-            
-            // Snap to grid
-            currentGrabbed.position.x = snapToGrid(currentGrabbed.position.x);
-            currentGrabbed.position.y = snapToGrid(currentGrabbed.position.y);
-            currentGrabbed.position.z = snapToGrid(currentGrabbed.position.z);
+      const overlapX = Math.min(thisBox.max.x, otherBox.max.x) - Math.max(thisBox.min.x, otherBox.min.x);
+      const overlapY = Math.min(thisBox.max.y, otherBox.max.y) - Math.max(thisBox.min.y, otherBox.min.y);
+      const overlapZ = Math.min(thisBox.max.z, otherBox.max.z) - Math.max(thisBox.min.z, otherBox.min.z);
 
-            grabbedBody.updateBoundingBox();
-            break; // Handle one collision at a time
-          }
-        }
+      // Pick smallest axis overlap to push away
+      if (overlapX < overlapY && overlapX < overlapZ) {
+        const dir = (thisBox.getCenter(new THREE.Vector3()).x < otherBox.getCenter(new THREE.Vector3()).x) ? -1 : 1;
+        currentGrabbed.position.x += overlapX * dir;
+      } else if (overlapY < overlapX && overlapY < overlapZ) {
+        const dir = (thisBox.getCenter(new THREE.Vector3()).y < otherBox.getCenter(new THREE.Vector3()).y) ? -1 : 1;
+        currentGrabbed.position.y += overlapY * dir;
+      } else {
+        const dir = (thisBox.getCenter(new THREE.Vector3()).z < otherBox.getCenter(new THREE.Vector3()).z) ? -1 : 1;
+        currentGrabbed.position.z += overlapZ * dir;
       }
+
+      // Snap to grid
+      currentGrabbed.position.x = snapToGrid(currentGrabbed.position.x);
+      currentGrabbed.position.y = snapToGrid(currentGrabbed.position.y);
+      currentGrabbed.position.z = snapToGrid(currentGrabbed.position.z);
+
+      grabbedBody.updateBoundingBox();
+    }
+  }
+}
+
 
       function resolveObjectCollisions(targetObject) {
         if (!collisionEnabled) return;
