@@ -1,0 +1,1009 @@
+
+
+  <!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>LegoCAD-like Sandbox (Three.js)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0e0f13; }
+      #app { display: block; }
+
+      #sidebar {
+        position: fixed; top: 0; right: 0; bottom: 0; width: 220px;
+        background: #181a20; border-left: 1px solid #2c2f3a; padding: 12px;
+        color: #e7eaf2; font-family: system-ui; overflow-y: auto; z-index: 5;
+      }
+      #sidebar h3 { margin: 6px 0 10px; font-size: 16px; }
+      .part-btn {
+        display: block; width: 100%; margin: 6px 0; padding: 8px 10px;
+        background: #2c2f3a; border: 0; border-radius: 8px; color: #fff;
+        text-align: left; cursor: pointer;
+      }
+      .part-btn:hover { background: #3b4052; }
+      #hint {
+        position: fixed; left: 12px; bottom: 12px; padding: 8px 10px;
+        background: #12151c; color: #c8cede; border: 1px solid #2b2f3a; border-radius: 10px;
+        font-family: system-ui; font-size: 13px; z-index: 5;
+      }
+      #hint code { background: #0b0e14; padding: 1px 5px; border-radius: 6px; }
+      
+      /* Gizmo Styles */
+      #gizmo-container {
+        position: absolute;
+        top: 10px;
+        right: 240px; /* Positioned to the left of sidebar */
+        width: 80px;
+        height: 80px;
+        border: 1px solid #333;
+        border-radius: 4px;
+        z-index: 10;
+        pointer-events: auto;
+      }
+
+      #multi-controls {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        background: #181a20;
+        border: 1px solid #2c2f3a;
+        border-radius: 8px;
+        padding: 10px;
+        color: #e7eaf2;
+        font-family: system-ui;
+        font-size: 12px;
+        z-index: 10;
+      }
+      
+      #multi-controls h4 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+      }
+      
+      .control-btn {
+        padding: 4px 8px;
+        margin: 2px;
+        background: #2c2f3a;
+        border: none;
+        border-radius: 4px;
+        color: #fff;
+        cursor: pointer;
+        font-size: 11px;
+      }
+      
+      .control-btn:hover {
+        background: #3b4052;
+      }
+
+      .debug-controls {
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px solid #2c2f3a;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="app"></canvas>
+    <div id="gizmo-container"></div>
+
+    <div id="multi-controls">
+      <h4>Multi-Selection</h4>
+      <div>Selected: <span id="selected-count">0</span></div>
+      <button class="control-btn" id="clear-selection">Clear All</button>
+      <button class="control-btn" id="delete-selected">Delete Selected</button>
+      
+      <div class="debug-controls">
+        <h4>Debug</h4>
+        <button class="control-btn" id="toggle-debug">Show Collision Mesh</button>
+        <button class="control-btn" id="disable-collision">Disable Collision</button>
+      </div>
+    </div>
+
+    <div id="sidebar">
+      <h3>Parts</h3>
+      <!-- Put your own files into /models and list them here -->
+      <button class="part-btn" data-model="2x4_L_Shaped_Beam.glb">Brick 1</button>
+      <button class="part-btn" data-model="3x3_T_Beam.glb">Brick</button>
+      <button class="part-btn" data-model="3x3_Triangle_With_3_Axle_Hole.glb">Wheel</button>
+            <button class="part-btn" data-model="peg.glb">peg</button>
+    </div>
+    
+    <button id="saveBtn" style="position:absolute; top:10px; right:10px; z-index:10; padding:8px 12px; border:none; border-radius:6px; background:#2d89ef; color:white; font-weight:bold; cursor:pointer;">Save JSON</button>
+    
+    <div id="hint">
+      Orbit: <code>Left-drag</code> • Pan: <code>Right-drag</code> • Zoom: <code>Wheel</code><br/>
+      Single: Click to grab/drop • Multi: <code>Shift+Click</code> to select multiple<br/>
+      Click selected group to move all • Hold <code>Shift</code> while dragging for Y-axis<br/>
+      <code>R</code>: X-axis • <code>Shift+R</code>: Z-axis • <code>Ctrl+R</code>: Y-axis rotation<br/>
+      Use mouse wheel for vertical movement. Click gizmo faces for quick camera views.
+    </div>
+
+    <script type="module">
+      // Three.js setup
+      const canvas = document.getElementById("app");
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0e0f13);
+
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+      camera.position.set(8, 6, 12);
+
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+      // Controls
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.target.set(0, 1, 0);
+
+      // Lighting
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 0.6));
+      const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+      dir.position.set(5, 10, 6);
+      dir.castShadow = false;
+      dir.shadow.mapSize.width = 2048;
+      dir.shadow.mapSize.height = 2048;
+      scene.add(dir);
+
+      // Ground
+      const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1f2b });
+      const ground = new THREE.Mesh(new THREE.BoxGeometry(40, 1, 40), groundMat);
+      ground.position.y = -0.5;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      // === 3D Gizmo Setup ===
+      const gizmoContainer = document.getElementById('gizmo-container');
+      const gizmoSize = 80;
+      const gizmoRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      gizmoRenderer.setSize(gizmoSize, gizmoSize);
+      gizmoRenderer.setClearColor(0x000000, 0);
+      gizmoContainer.appendChild(gizmoRenderer.domElement);
+
+      const gizmoScene = new THREE.Scene();
+      const gizmoCamera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10);
+      gizmoCamera.position.set(0, 0, 5);
+
+      // Create cube gizmo with face materials
+      const gizmoGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+      const gizmoMaterials = [
+        new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.8 }), // +X Red
+        new THREE.MeshBasicMaterial({ color: 0x884444, transparent: true, opacity: 0.8 }), // -X Dark Red
+        new THREE.MeshBasicMaterial({ color: 0x44ff44, transparent: true, opacity: 0.8 }), // +Y Green
+        new THREE.MeshBasicMaterial({ color: 0x448844, transparent: true, opacity: 0.8 }), // -Y Dark Green
+        new THREE.MeshBasicMaterial({ color: 0x4444ff, transparent: true, opacity: 0.8 }), // +Z Blue
+        new THREE.MeshBasicMaterial({ color: 0x444488, transparent: true, opacity: 0.8 })  // -Z Dark Blue
+      ];
+
+      const gizmoCube = new THREE.Mesh(gizmoGeometry, gizmoMaterials);
+      gizmoScene.add(gizmoCube);
+
+      // Gizmo click handling
+      const gizmoRaycaster = new THREE.Raycaster();
+      const gizmoMouse = new THREE.Vector2();
+
+      function onGizmoClick(event) {
+        event.stopPropagation();
+        
+        const rect = gizmoRenderer.domElement.getBoundingClientRect();
+        gizmoMouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        gizmoMouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        
+        gizmoRaycaster.setFromCamera(gizmoMouse, gizmoCamera);
+        const intersects = gizmoRaycaster.intersectObject(gizmoCube);
+        
+        if (intersects.length > 0) {
+          const faceIndex = Math.floor(intersects[0].faceIndex / 2);
+          
+          // Camera positions for each face
+          const distance = 15;
+          const positions = [
+            [distance, 1, 0],   // +X Right
+            [-distance, 1, 0],  // -X Left  
+            [0, distance, 0],   // +Y Top
+            [0, -distance + 2, 0], // -Y Bottom
+            [0, 1, distance],   // +Z Front
+            [0, 1, -distance]   // -Z Back
+          ];
+          
+          if (positions[faceIndex]) {
+            const newPos = positions[faceIndex];
+            
+            // Smooth camera transition
+            const startPos = camera.position.clone();
+            const endPos = new THREE.Vector3(...newPos);
+            const startTime = Date.now();
+            const duration = 500;
+            
+            function animateCamera() {
+              const elapsed = Date.now() - startTime;
+              const progress = Math.min(elapsed / duration, 1);
+              const easeProgress = 1 - Math.pow(1 - progress, 3);
+              
+              camera.position.lerpVectors(startPos, endPos, easeProgress);
+              camera.lookAt(controls.target);
+              
+              if (progress < 1) {
+                requestAnimationFrame(animateCamera);
+              }
+            }
+            
+            animateCamera();
+          }
+        }
+      }
+
+      gizmoRenderer.domElement.addEventListener('click', onGizmoClick);
+
+      // === Object System ===
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+      let currentGrabbed = null;
+      let selectedObjects = new Set(); // Multi-selection set
+      let isShiftDown = false;
+      let isCtrlDown = false;
+      let highlighted = null;
+      let lastMousePosition = { x: 0, y: 0 };
+      let accumulatedMovement = { x: 0, y: 0, z: 0 };
+      const rigidBodies = [];
+      const collisionMargin = 0.05;
+      const GRID_SIZE = 1.5;
+      
+      // Multi-selection movement variables
+      let multiSelectionActive = false;
+      let selectedObjectsInitialPositions = new Map();
+      
+      // Debug and collision variables
+      let showCollisionDebug = false;
+      let collisionEnabled = true;
+
+      class RigidBody {
+        constructor(object) {
+          this.object = object;
+          this.boundingBox = new THREE.Box3();
+          this.debugMesh = null;
+          this.showDebug = false;
+          this.meshGeometries = [];
+          this.extractMeshGeometry();
+          this.updateBoundingBox();
+        }
+
+        extractMeshGeometry() {
+          this.meshGeometries = [];
+          
+          this.object.traverse((child) => {
+            if (child.isMesh && child.geometry) {
+              // Store reference to the actual mesh and its geometry
+              this.meshGeometries.push({
+                mesh: child,
+                geometry: child.geometry.clone(),
+                originalGeometry: child.geometry
+              });
+            }
+          });
+        }
+
+        createDebugVisualization() {
+          this.removeDebugVisualization();
+          
+          if (!this.showDebug) return;
+          
+          // Create wireframe versions of all meshes in the object
+          this.object.traverse((child) => {
+            if (child.isMesh && child.geometry) {
+              // Create wireframe geometry from the actual mesh
+              const wireframeGeometry = new THREE.WireframeGeometry(child.geometry);
+              const wireframeMaterial = new THREE.LineBasicMaterial({
+                color: 0x00ff00,
+                transparent: true,
+                opacity: 0.8,
+                linewidth: 2
+              });
+              
+              const wireframe = new THREE.LineSegments(wireframeGeometry, wireframeMaterial);
+              
+              // Copy transform from the original mesh
+              wireframe.position.copy(child.position);
+              wireframe.rotation.copy(child.rotation);
+              wireframe.scale.copy(child.scale);
+              wireframe.matrix.copy(child.matrix);
+              wireframe.matrixWorld.copy(child.matrixWorld);
+              
+              // Add wireframe as child of the main object so it follows automatically
+              child.add(wireframe);
+              
+              // Store reference for cleanup
+              if (!this.debugMesh) this.debugMesh = [];
+              this.debugMesh.push(wireframe);
+            }
+          });
+        }
+
+        removeDebugVisualization() {
+          if (this.debugMesh) {
+            if (Array.isArray(this.debugMesh)) {
+              this.debugMesh.forEach(mesh => {
+                if (mesh.parent) {
+                  mesh.parent.remove(mesh);
+                }
+              });
+            } else {
+              if (this.debugMesh.parent) {
+                this.debugMesh.parent.remove(this.debugMesh);
+              }
+            }
+            this.debugMesh = null;
+          }
+        }
+
+        updateBoundingBox() {
+          this.object.updateMatrixWorld(true);
+          this.boundingBox.setFromObject(this.object);
+          // Debug visualization will automatically follow since it's a child of the object
+        }
+
+        toggleDebugVisualization() {
+          this.showDebug = !this.showDebug;
+          if (this.showDebug) {
+            this.createDebugVisualization();
+          } else {
+            this.removeDebugVisualization();
+          }
+        }
+
+        // Check collision using raycasting against actual mesh geometry
+        checkCollisionWith(other) {
+          if (other === this) return false;
+          
+          // Quick bounding box check first
+          const expandedBox = this.boundingBox.clone();
+          expandedBox.expandByScalar(collisionMargin);
+          if (!expandedBox.intersectsBox(other.boundingBox)) {
+            return false;
+          }
+          
+          // Use raycasting to check if objects actually intersect
+          return this.meshIntersectsWithOther(other);
+        }
+
+        meshIntersectsWithOther(other) {
+          const raycaster = new THREE.Raycaster();
+          
+          // Sample points around this object's bounding box
+          const thisBox = this.boundingBox;
+          const thisCenter = thisBox.getCenter(new THREE.Vector3());
+          const thisSize = thisBox.getSize(new THREE.Vector3());
+          
+          // Create sample points
+          const samplePoints = [];
+          const samples = 8;
+          
+          for (let i = 0; i < samples; i++) {
+            for (let j = 0; j < samples; j++) {
+              const x = thisCenter.x + (i / (samples - 1) - 0.5) * thisSize.x;
+              const y = thisCenter.y + (j / (samples - 1) - 0.5) * thisSize.y;
+              const z = thisCenter.z;
+              samplePoints.push(new THREE.Vector3(x, y, z));
+            }
+          }
+          
+          // Check if any sample points are inside the other object
+          for (let point of samplePoints) {
+            // Cast rays in multiple directions from each point
+            const directions = [
+              new THREE.Vector3(1, 0, 0),
+              new THREE.Vector3(-1, 0, 0),
+              new THREE.Vector3(0, 1, 0),
+              new THREE.Vector3(0, -1, 0),
+              new THREE.Vector3(0, 0, 1),
+              new THREE.Vector3(0, 0, -1)
+            ];
+            
+            for (let direction of directions) {
+              raycaster.set(point, direction);
+              
+              let intersectionCount = 0;
+              other.object.traverse((child) => {
+                if (child.isMesh) {
+                  const intersects = raycaster.intersectObject(child, false);
+                  intersectionCount += intersects.length;
+                }
+              });
+              
+              // If odd number of intersections, point is inside mesh
+              if (intersectionCount % 2 === 1) {
+                return true;
+              }
+            }
+          }
+          
+          return false;
+        }
+
+        destroy() {
+          this.removeDebugVisualization();
+        }
+      }
+
+      function snapToGrid(value) {
+        return Math.round(value / GRID_SIZE) * GRID_SIZE;
+      }
+
+      function highlightObject(obj, color = 0x3399ff) {
+        if (obj) {
+          obj.traverse((o) => {
+            if (o.isMesh) {
+              if (!o.material.userData.originalEmissive) {
+                o.material.userData.originalEmissive = o.material.emissive.clone();
+              }
+              o.material.emissive.setHex(color);
+            }
+          });
+        }
+      }
+
+      function unhighlightObject(obj) {
+        if (obj) {
+          obj.traverse((o) => {
+            if (o.isMesh && o.material?.userData?.originalEmissive) {
+              o.material.emissive.copy(o.material.userData.originalEmissive);
+            }
+          });
+        }
+      }
+
+      function updateSelection() {
+        // Clear all highlights first
+        scene.children.forEach(obj => {
+          if (obj !== ground && obj.isGroup) {
+            unhighlightObject(obj);
+          }
+        });
+
+        // Highlight selected objects
+        selectedObjects.forEach(obj => {
+          highlightObject(obj, 0xff6600); // Orange for selected
+        });
+
+        // Highlight grabbed object differently
+        if (currentGrabbed) {
+          highlightObject(currentGrabbed, 0x3399ff); // Blue for grabbed
+        }
+
+        // Update UI
+        document.getElementById('selected-count').textContent = selectedObjects.size;
+      }
+
+      function addToSelection(obj) {
+        selectedObjects.add(obj);
+        updateSelection();
+      }
+
+      function removeFromSelection(obj) {
+        selectedObjects.delete(obj);
+        updateSelection();
+      }
+
+      function clearSelection() {
+        selectedObjects.clear();
+        updateSelection();
+      }
+
+      function resolveGrabbedCollisions() {
+        if (!currentGrabbed || !collisionEnabled) return;
+
+        const grabbedBody = rigidBodies.find(b => b.object === currentGrabbed);
+        if (!grabbedBody) return;
+
+        grabbedBody.updateBoundingBox();
+
+        // Ground collision
+        const minY = grabbedBody.boundingBox.min.y;
+        const groundY = 0;
+        if (minY < groundY) {
+          const offset = groundY - minY;
+          currentGrabbed.position.y += offset;
+          grabbedBody.updateBoundingBox();
+        }
+
+        // Object collisions - simplified approach
+        for (let other of rigidBodies) {
+          if (other.object === currentGrabbed) continue;
+
+          if (grabbedBody.checkCollisionWith(other)) {
+            // Simple push-away collision resolution
+            const thisBox = grabbedBody.boundingBox;
+            const otherBox = other.boundingBox;
+
+            const thisCenter = thisBox.getCenter(new THREE.Vector3());
+            const otherCenter = otherBox.getCenter(new THREE.Vector3());
+            
+            // Calculate push direction
+            const pushDirection = thisCenter.clone().sub(otherCenter).normalize();
+            
+            // If direction is too small, use default direction
+            if (pushDirection.length() < 0.1) {
+              pushDirection.set(1, 0, 0);
+            }
+            
+            // Calculate minimum separation distance
+            const thisSize = thisBox.getSize(new THREE.Vector3());
+            const otherSize = otherBox.getSize(new THREE.Vector3());
+            const minDistance = Math.max(thisSize.length(), otherSize.length()) * 0.6;
+            
+            // Push object away
+            const targetPos = otherCenter.clone().add(pushDirection.multiplyScalar(minDistance));
+            const displacement = targetPos.sub(thisCenter);
+            
+            currentGrabbed.position.add(displacement);
+            
+            // Snap to grid
+            currentGrabbed.position.x = snapToGrid(currentGrabbed.position.x);
+            currentGrabbed.position.y = snapToGrid(currentGrabbed.position.y);
+            currentGrabbed.position.z = snapToGrid(currentGrabbed.position.z);
+
+            grabbedBody.updateBoundingBox();
+            break; // Handle one collision at a time
+          }
+        }
+      }
+
+      function resolveObjectCollisions(targetObject) {
+        if (!collisionEnabled) return;
+        
+        const targetBody = rigidBodies.find(b => b.object === targetObject);
+        if (!targetBody) return;
+
+        targetBody.updateBoundingBox();
+
+        // Ground collision
+        const minY = targetBody.boundingBox.min.y;
+        const groundY = 0;
+        if (minY < groundY) {
+          const offset = groundY - minY;
+          targetObject.position.y += offset;
+          targetBody.updateBoundingBox();
+        }
+
+        // Object collisions - simplified approach
+        for (let other of rigidBodies) {
+          if (other.object === targetObject) continue;
+
+          if (targetBody.checkCollisionWith(other)) {
+            const thisBox = targetBody.boundingBox;
+            const otherBox = other.boundingBox;
+
+            const thisCenter = thisBox.getCenter(new THREE.Vector3());
+            const otherCenter = otherBox.getCenter(new THREE.Vector3());
+            
+            // Calculate push direction
+            const pushDirection = thisCenter.clone().sub(otherCenter).normalize();
+            
+            if (pushDirection.length() < 0.1) {
+              pushDirection.set(1, 0, 0);
+            }
+            
+            // Calculate minimum separation distance
+            const thisSize = thisBox.getSize(new THREE.Vector3());
+            const otherSize = otherBox.getSize(new THREE.Vector3());
+            const minDistance = Math.max(thisSize.length(), otherSize.length()) * 0.6;
+            
+            // Push object away
+            const targetPos = otherCenter.clone().add(pushDirection.multiplyScalar(minDistance));
+            const displacement = targetPos.sub(thisCenter);
+            
+            targetObject.position.add(displacement);
+            
+            // Snap to grid
+            targetObject.position.x = snapToGrid(targetObject.position.x);
+            targetObject.position.y = snapToGrid(targetObject.position.y);
+            targetObject.position.z = snapToGrid(targetObject.position.z);
+
+            targetBody.updateBoundingBox();
+            break;
+          }
+        }
+      }
+
+      // Mouse Controls
+      window.addEventListener("mousemove", (e) => {
+        const objectsToMove = currentGrabbed ? [currentGrabbed] : 
+                             (multiSelectionActive ? Array.from(selectedObjects) : []);
+        
+        if (objectsToMove.length === 0) return;
+
+        const threshold = 100;
+        const deltaX = e.clientX - lastMousePosition.x;
+        const deltaY = e.clientY - lastMousePosition.y;
+
+        if (isShiftDown) {
+          accumulatedMovement.y += deltaY;
+          
+          if (Math.abs(accumulatedMovement.y) >= threshold) {
+            const direction = accumulatedMovement.y > 0 ? -1 : 1;
+            const movement = GRID_SIZE * direction;
+            
+            objectsToMove.forEach(obj => {
+              obj.position.y = snapToGrid(obj.position.y + movement);
+            });
+            
+            accumulatedMovement.y = 0;
+            lastMousePosition.x = e.clientX;
+            lastMousePosition.y = e.clientY;
+            
+            if (currentGrabbed) {
+              resolveGrabbedCollisions();
+            } else {
+              objectsToMove.forEach(obj => resolveObjectCollisions(obj));
+            }
+          }
+        } else {
+          accumulatedMovement.x += deltaX;
+          accumulatedMovement.z += deltaY;
+
+          const cameraRight = new THREE.Vector3();
+          camera.getWorldDirection(cameraRight);
+          cameraRight.cross(camera.up).normalize();
+
+          const cameraForward = new THREE.Vector3();
+          camera.getWorldDirection(cameraForward);
+          cameraForward.y = 0;
+          cameraForward.normalize();
+
+          if (Math.abs(accumulatedMovement.x) >= threshold) {
+            const direction = accumulatedMovement.x > 0 ? 1 : -1;
+            const moveVector = cameraRight.clone().multiplyScalar(GRID_SIZE * direction);
+            
+            objectsToMove.forEach(obj => {
+              obj.position.x = snapToGrid(obj.position.x + moveVector.x);
+              obj.position.z = snapToGrid(obj.position.z + moveVector.z);
+            });
+            
+            accumulatedMovement.x = 0;
+            lastMousePosition.x = e.clientX;
+            
+            if (currentGrabbed) {
+              resolveGrabbedCollisions();
+            } else {
+              objectsToMove.forEach(obj => resolveObjectCollisions(obj));
+            }
+          }
+
+          if (Math.abs(accumulatedMovement.z) >= threshold) {
+            const direction = accumulatedMovement.z > 0 ? -1 : 1;
+            const moveVector = cameraForward.clone().multiplyScalar(GRID_SIZE * direction);
+            
+            objectsToMove.forEach(obj => {
+              obj.position.x = snapToGrid(obj.position.x + moveVector.x);
+              obj.position.z = snapToGrid(obj.position.z + moveVector.z);
+            });
+            
+            accumulatedMovement.z = 0;
+            lastMousePosition.y = e.clientY;
+            
+            if (currentGrabbed) {
+              resolveGrabbedCollisions();
+            } else {
+              objectsToMove.forEach(obj => resolveObjectCollisions(obj));
+            }
+          }
+        }
+      });
+
+      window.addEventListener("wheel", (e) => {
+        const objectsToMove = currentGrabbed ? [currentGrabbed] : 
+                             (multiSelectionActive ? Array.from(selectedObjects) : []);
+                             
+        if (objectsToMove.length > 0) {
+          e.preventDefault();
+          const direction = e.deltaY > 0 ? -1 : 1;
+          const movement = GRID_SIZE * direction;
+          
+          objectsToMove.forEach(obj => {
+            obj.position.y = snapToGrid(obj.position.y + movement);
+          });
+          
+          if (currentGrabbed) {
+            resolveGrabbedCollisions();
+          } else {
+            objectsToMove.forEach(obj => resolveObjectCollisions(obj));
+          }
+        }
+      });
+
+      function addRigidBody(object) {
+        const rb = new RigidBody(object);
+        rigidBodies.push(rb);
+        return rb;
+      }
+
+      window.addEventListener("click", (e) => {
+        // Skip if clicking on UI elements
+        if (e.target.closest('#sidebar') || e.target.closest('#multi-controls') || e.target.closest('#gizmo-container')) {
+          return;
+        }
+
+        if (currentGrabbed || multiSelectionActive) {
+          currentGrabbed = null;
+          multiSelectionActive = false;
+          isShiftDown = false;
+          accumulatedMovement = { x: 0, y: 0, z: 0 };
+          selectedObjectsInitialPositions.clear();
+          updateSelection();
+        } else {
+          const x = (e.clientX / window.innerWidth) * 2 - 1;
+          const y = -(e.clientY / window.innerHeight) * 2 + 1;
+          mouse.set(x, y);
+          raycaster.setFromCamera(mouse, camera);
+
+          const hits = raycaster.intersectObjects(scene.children, true);
+          if (hits.length > 0 && hits[0].object !== ground) {
+            let target = hits[0].object;
+            while (target.parent && target.parent !== scene) {
+              target = target.parent;
+            }
+
+            if (e.shiftKey) {
+              // Multi-selection mode
+              if (selectedObjects.has(target)) {
+                removeFromSelection(target);
+              } else {
+                addToSelection(target);
+              }
+            } else {
+              // Check if clicked object is in selection
+              if (selectedObjects.has(target) && selectedObjects.size > 1) {
+                // Start multi-selection movement
+                multiSelectionActive = true;
+                
+                // Store initial positions
+                selectedObjects.forEach(obj => {
+                  selectedObjectsInitialPositions.set(obj, obj.position.clone());
+                });
+                
+                lastMousePosition.x = e.clientX;
+                lastMousePosition.y = e.clientY;
+                accumulatedMovement = { x: 0, y: 0, z: 0 };
+                
+                updateSelection();
+              } else {
+                // Single grab mode
+                clearSelection();
+                currentGrabbed = target;
+                
+                currentGrabbed.position.x = snapToGrid(currentGrabbed.position.x);
+                currentGrabbed.position.y = snapToGrid(currentGrabbed.position.y);
+                currentGrabbed.position.z = snapToGrid(currentGrabbed.position.z);
+
+                lastMousePosition.x = e.clientX;
+                lastMousePosition.y = e.clientY;
+                accumulatedMovement = { x: 0, y: 0, z: 0 };
+
+                updateSelection();
+                resolveGrabbedCollisions();
+              }
+            }
+          } else if (!e.shiftKey) {
+            clearSelection();
+          }
+        }
+      });
+
+      // Enhanced Keyboard Controls
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Shift") {
+          isShiftDown = true;
+        }
+        if (e.key === "Control" || e.key === "Meta") {
+          isCtrlDown = true;
+        }
+
+        // Enhanced rotation with X-axis support
+        if (e.key.toLowerCase() === "r") {
+          const objectsToRotate = currentGrabbed ? [currentGrabbed] : Array.from(selectedObjects);
+          
+          objectsToRotate.forEach(obj => {
+            if (e.ctrlKey || e.metaKey) {
+              // Rotate around X axis when holding Ctrl/Cmd
+              obj.rotation.y += Math.PI / 2;
+              obj.rotation.y = Math.round(obj.rotation.y / (Math.PI / 2)) * (Math.PI / 2);
+            } else if (e.shiftKey) {
+              // Rotate around Z axis when holding Shift
+              obj.rotation.z += Math.PI / 2;
+              obj.rotation.z = Math.round(obj.rotation.z / (Math.PI / 2)) * (Math.PI / 2);
+            } else {
+              // Rotate around Y axis (default)
+              obj.rotation.x += Math.PI / 2;
+              obj.rotation.x = Math.round(obj.rotation.x / (Math.PI / 2)) * (Math.PI / 2);
+            }
+          });
+
+          if (currentGrabbed) {
+            resolveGrabbedCollisions();
+          }
+        }
+
+        // Delete selected objects
+        if (e.key === "Delete" || e.key === "Backspace") {
+          const objectsToDelete = currentGrabbed ? [currentGrabbed] : Array.from(selectedObjects);
+          
+          objectsToDelete.forEach(obj => {
+            scene.remove(obj);
+            const rbIndex = rigidBodies.findIndex(rb => rb.object === obj);
+            if (rbIndex !== -1) {
+              rigidBodies.splice(rbIndex, 1);
+            }
+            selectedObjects.delete(obj);
+            if (obj === currentGrabbed) {
+              currentGrabbed = null;
+            }
+          });
+
+          updateSelection();
+        }
+      });
+
+      window.addEventListener("keyup", (e) => {
+        if (e.key === "Shift") {
+          isShiftDown = false;
+        }
+        if (e.key === "Control" || e.key === "Meta") {
+          isCtrlDown = false;
+        }
+      });
+
+      // Debug controls
+      document.getElementById('toggle-debug').addEventListener('click', () => {
+        showCollisionDebug = !showCollisionDebug;
+        const btn = document.getElementById('toggle-debug');
+        btn.textContent = showCollisionDebug ? 'Hide Collision Mesh' : 'Show Collision Mesh';
+        
+        rigidBodies.forEach(rb => {
+          rb.showDebug = showCollisionDebug;
+          if (showCollisionDebug) {
+            rb.createDebugVisualization();
+          } else {
+            rb.removeDebugVisualization();
+          }
+        });
+      });
+
+      document.getElementById('disable-collision').addEventListener('click', () => {
+        collisionEnabled = !collisionEnabled;
+        const btn = document.getElementById('disable-collision');
+        btn.textContent = collisionEnabled ? 'Disable Collision' : 'Enable Collision';
+      });
+
+      // Multi-selection controls
+      document.getElementById('clear-selection').addEventListener('click', clearSelection);
+      
+      document.getElementById('delete-selected').addEventListener('click', () => {
+        Array.from(selectedObjects).forEach(obj => {
+          scene.remove(obj);
+          const rbIndex = rigidBodies.findIndex(rb => rb.object === obj);
+          if (rbIndex !== -1) {
+            rigidBodies.splice(rbIndex, 1);
+          }
+        });
+        clearSelection();
+      });
+
+      // Model spawning
+      const gltfLoader = new THREE.GLTFLoader();
+      document.querySelectorAll(".part-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          
+          if (currentGrabbed) return;
+
+          const file = btn.dataset.model;
+          gltfLoader.load(`models/${file}`, (gltf) => {
+            const model = gltf.scene || gltf.scenes?.[0];
+            if (!model) return;
+
+            model.traverse((o) => {
+              if (o.isMesh) {
+                o.castShadow = false;
+                o.receiveShadow = false;
+                if (o.material) o.material.side = THREE.FrontSide;
+              }
+            });
+
+            model.position.set(
+              snapToGrid(Math.random() * 10 - 2), 
+              snapToGrid(10), 
+              snapToGrid(Math.random() * 10 - 2)
+            );
+            scene.add(model);
+
+            const rb = addRigidBody(model);
+            if (showCollisionDebug) {
+              rb.showDebug = true;
+              rb.createDebugVisualization();
+            }
+            
+            clearSelection();
+            currentGrabbed = model;
+            
+            lastMousePosition.x = window.innerWidth / 2;
+            lastMousePosition.y = window.innerHeight / 2;
+            accumulatedMovement = { x: 0, y: 0, z: 0 };
+
+            updateSelection();
+            resolveGrabbedCollisions();
+          });
+        });
+      });
+
+      // Resize
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // Function to collect objects (only top-level groups, not meshes)
+      function getSceneObjects(scene) {
+        const objects = [];
+        scene.children.forEach((obj) => {
+          // Skip ground and lights
+          if (obj === ground || obj.isLight || obj.isCamera) return;
+          // Only export groups (GLTF models are groups)
+          if (obj.isGroup) {
+            objects.push({
+              name: obj.name || obj.children[0]?.name || "Unnamed",
+              position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
+              rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
+              scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z },
+              model: obj.children[0]?.name || "Unknown", // Use the first mesh's name as model identifier
+            });
+          }
+        });
+        return objects;
+      }
+
+      // Function to export and download
+      function exportToJSON(scene) {
+        const objects = getSceneObjects(scene);
+        const jsonData = JSON.stringify(objects, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'scene_export.json';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      // Add event listener to save button
+      document.getElementById('saveBtn').addEventListener('click', () => {
+        exportToJSON(scene);
+      });
+
+      // Animation loop
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        
+        // Update gizmo rotation to match main camera
+        gizmoCube.rotation.copy(camera.rotation);
+        gizmoCube.rotation.x *= -1;
+        gizmoCube.rotation.y *= -1;
+        
+        // Render both scenes
+        renderer.render(scene, camera);
+        gizmoRenderer.render(gizmoScene, gizmoCamera);
+      }
+      
+      animate();
+    </script>
+    
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  </body>
+</html>
