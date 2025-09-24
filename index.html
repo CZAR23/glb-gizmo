@@ -1,6 +1,4 @@
-
-
-  <!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -29,11 +27,10 @@
       }
       #hint code { background: #0b0e14; padding: 1px 5px; border-radius: 6px; }
       
-      /* Gizmo Styles */
       #gizmo-container {
         position: absolute;
         top: 10px;
-        right: 240px; /* Positioned to the left of sidebar */
+        right: 240px;
         width: 80px;
         height: 80px;
         border: 1px solid #333;
@@ -84,6 +81,10 @@
     </style>
   </head>
   <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    
     <canvas id="app"></canvas>
     <div id="gizmo-container"></div>
 
@@ -95,37 +96,50 @@
       
       <div class="debug-controls">
         <h4>Debug</h4>
-        <button class="control-btn" id="toggle-debug">Show Collision Mesh</button>
+        <button class="control-btn" id="toggle-grid">Grid Removed</button>
+        <button class="control-btn" id="toggle-debug">Show Collision Box</button>
         <button class="control-btn" id="disable-collision">Disable Collision</button>
       </div>
     </div>
 
     <div id="sidebar">
       <h3>Parts</h3>
-      <!-- Put your own files into /models and list them here -->
-      <button class="part-btn" data-model="2x4_L_Shaped_Beam.glb">Brick 1</button>
-      <button class="part-btn" data-model="3x3_T_Beam.glb">Brick</button>
-      <button class="part-btn" data-model="3x3_Triangle_With_3_Axle_Hole.glb">Wheel</button>
-      <button class="part-btn" data-model="peg.glb">peg</button>
+      <button class="part-btn" data-model="Beam_2.glb">Beam_2</button>
+      <button class="part-btn" data-model="Beam_3.glb">Beam_3</button>
       <button class="part-btn" data-model="Beam_5.glb">Beam_5</button>
       <button class="part-btn" data-model="Beam_7.glb">Beam_7</button>
+      <button class="part-btn" data-model="Beam_9.glb">Beam_9</button>
+      <button class="part-btn" data-model="Beam_11.glb">Beam_11</button>
+      <button class="part-btn" data-model="Beam_13.glb">Beam_13</button>
+      <button class="part-btn" data-model="Beam_15.glb">Beam_15</button>
+      <button class="part-btn" data-model="peg.glb">peg</button>
+      <button class="part-btn" data-model="Wheel_24mm.glb">Wheel_24mm</button>
+      <button class="part-btn" data-model="Wheel_30mm.glb">Wheel_30mm</button>
+      <button class="part-btn" data-model="4x4_Angled_Beam.glb">4x4_Angled_Beam</button>
+      <button class="part-btn" data-model="2x4_L_beam.glb">2x4_L_Beam</button>
+      <button class="part-btn" data-model="7x3_Angled_Beam.glb">7x3_Angled_Beam</button>
+      <button class="part-btn" data-model="7x3x3_Angled_Beam_With_Axle_Hole.glb">7x3x3_Angled_Beam_With_Axle_Hole</button>
+      <button class="part-btn" data-model="7x5_Block.glb">7x5_Block</button>
+      <button class="part-btn" data-model="10x5_Block.glb">10x5_Block</button>
+      <button class="part-btn" data-model="11x5_H_block.glb">11x5_H_block</button>
+      <button class="part-btn" data-model="5x11_Technic_Plate.glb">5x11_Technic_Plate</button>
+      <button class="part-btn" data-model="15x5_Block.glb">15x5_Block</button>
+      <button class="part-btn" data-model="7x7_Block.glb">7x7_Block</button>
+      <button class="part-btn" data-model="14x7_Block.glb">14x7_Block</button>
     </div>
-    
+     
     <button id="saveBtn" style="position:absolute; top:10px; right:10px; z-index:10; padding:8px 12px; border:none; border-radius:6px; background:#2d89ef; color:white; font-weight:bold; cursor:pointer;">Save JSON</button>
-    
+     
     <div id="hint">
-      Orbit: <code>Left-drag</code> • Pan: <code>Right-drag</code> • Zoom: <code>Wheel</code><br/>
-      Single: Click to grab/drop • Multi: <code>Shift+Click</code> to select multiple<br/>
-      Click selected group to move all • Hold <code>Shift</code> while dragging for Y-axis<br/>
-      <code>R</code>: X-axis • <code>Shift+R</code>: Z-axis • <code>Ctrl+R</code>: Y-axis rotation<br/>
-      Use mouse wheel for vertical movement. Click gizmo faces for quick camera views.
+      Click object to grab from exact point • Hold <code>Shift</code> for Y-axis (2.6 steps)<br/>
+      Mouse wheel for Y movement • <code>R</code> to rotate • Multi-select: <code>Shift+Click</code>
     </div>
 
     <script type="module">
       // Three.js setup
       const canvas = document.getElementById("app");
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x0e0f13);
+      scene.background = new THREE.Color(0xf0f0f0);
 
       const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
       camera.position.set(8, 6, 12);
@@ -136,7 +150,6 @@
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-      // Controls
       const controls = new THREE.OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
       controls.target.set(0, 1, 0);
@@ -145,23 +158,26 @@
       scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 0.6));
       const dir = new THREE.DirectionalLight(0xffffff, 0.9);
       dir.position.set(5, 10, 6);
-      dir.castShadow = false;
+      dir.castShadow = true;
       dir.shadow.mapSize.width = 2048;
       dir.shadow.mapSize.height = 2048;
       scene.add(dir);
 
+      // Grid Constants
+      const GRID_SIZE = 0.05;
+      const GRID_SIZEy = 2.6;
+
       // Ground
-      const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1f2b });
-      const ground = new THREE.Mesh(new THREE.BoxGeometry(40, 1, 40), groundMat);
-      ground.position.y = -0.5;
+      const groundMat = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, transparent: true, opacity: 0.7 });
+      const ground = new THREE.Mesh(new THREE.BoxGeometry(40, 0.1, 40), groundMat);
+      ground.position.y = -0.05;
       ground.receiveShadow = true;
       scene.add(ground);
 
-      // === 3D Gizmo Setup ===
+      // Gizmo setup
       const gizmoContainer = document.getElementById('gizmo-container');
-      const gizmoSize = 80;
       const gizmoRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      gizmoRenderer.setSize(gizmoSize, gizmoSize);
+      gizmoRenderer.setSize(80, 80);
       gizmoRenderer.setClearColor(0x000000, 0);
       gizmoContainer.appendChild(gizmoRenderer.domElement);
 
@@ -169,237 +185,172 @@
       const gizmoCamera = new THREE.OrthographicCamera(-2, 2, 2, -2, 0.1, 10);
       gizmoCamera.position.set(0, 0, 5);
 
-      // Create cube gizmo with face materials
-      const gizmoGeometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-      const gizmoMaterials = [
-        new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.8 }), // +X Red
-        new THREE.MeshBasicMaterial({ color: 0x884444, transparent: true, opacity: 0.8 }), // -X Dark Red
-        new THREE.MeshBasicMaterial({ color: 0x44ff44, transparent: true, opacity: 0.8 }), // +Y Green
-        new THREE.MeshBasicMaterial({ color: 0x448844, transparent: true, opacity: 0.8 }), // -Y Dark Green
-        new THREE.MeshBasicMaterial({ color: 0x4444ff, transparent: true, opacity: 0.8 }), // +Z Blue
-        new THREE.MeshBasicMaterial({ color: 0x444488, transparent: true, opacity: 0.8 })  // -Z Dark Blue
-      ];
-
-      const gizmoCube = new THREE.Mesh(gizmoGeometry, gizmoMaterials);
+      const gizmoCube = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 1.2, 1.2),
+        [
+          new THREE.MeshBasicMaterial({ color: 0xff4444 }), // +X Red
+          new THREE.MeshBasicMaterial({ color: 0xaa2222 }), // -X Dark Red
+          new THREE.MeshBasicMaterial({ color: 0x44ff44 }), // +Y Green
+          new THREE.MeshBasicMaterial({ color: 0x22aa22 }), // -Y Dark Green
+          new THREE.MeshBasicMaterial({ color: 0x4444ff }), // +Z Blue
+          new THREE.MeshBasicMaterial({ color: 0x2222aa })  // -Z Dark Blue
+        ]
+      );
       gizmoScene.add(gizmoCube);
 
-      // Gizmo click handling
-      const gizmoRaycaster = new THREE.Raycaster();
-      const gizmoMouse = new THREE.Vector2();
-
-      function onGizmoClick(event) {
+      gizmoRenderer.domElement.addEventListener('click', (event) => {
+        event.preventDefault();
         event.stopPropagation();
-        
         const rect = gizmoRenderer.domElement.getBoundingClientRect();
-        gizmoMouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        gizmoMouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        const mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         
-        gizmoRaycaster.setFromCamera(gizmoMouse, gizmoCamera);
-        const intersects = gizmoRaycaster.intersectObject(gizmoCube);
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), gizmoCamera);
+        const intersects = raycaster.intersectObject(gizmoCube);
         
         if (intersects.length > 0) {
           const faceIndex = Math.floor(intersects[0].faceIndex / 2);
-          
-          // Camera positions for each face
-          const distance = 15;
           const positions = [
-            [distance, 1, 0],   // +X Right
-            [-distance, 1, 0],  // -X Left  
-            [0, distance, 0],   // +Y Top
-            [0, -distance + 2, 0], // -Y Bottom
-            [0, 1, distance],   // +Z Front
-            [0, 1, -distance]   // -Z Back
+            [15, 2, 0], [-15, 2, 0], [0, 15, 0], [0, -5, 0], [0, 2, 15], [0, 2, -15]
           ];
           
           if (positions[faceIndex]) {
-            const newPos = positions[faceIndex];
-            
-            // Smooth camera transition
-            const startPos = camera.position.clone();
-            const endPos = new THREE.Vector3(...newPos);
-            const startTime = Date.now();
-            const duration = 500;
-            
-            function animateCamera() {
-              const elapsed = Date.now() - startTime;
-              const progress = Math.min(elapsed / duration, 1);
-              const easeProgress = 1 - Math.pow(1 - progress, 3);
-              
-              camera.position.lerpVectors(startPos, endPos, easeProgress);
-              camera.lookAt(controls.target);
-              
-              if (progress < 1) {
-                requestAnimationFrame(animateCamera);
-              }
-            }
-            
-            animateCamera();
+            camera.position.set(...positions[faceIndex]);
+            camera.lookAt(controls.target);
           }
         }
-      }
+      });
 
-      gizmoRenderer.domElement.addEventListener('click', onGizmoClick);
-
-      // === Object System ===
+      // Core variables
       const raycaster = new THREE.Raycaster();
       const mouse = new THREE.Vector2();
       let currentGrabbed = null;
-      let selectedObjects = new Set(); // Multi-selection set
+      let selectedObjects = new Set();
       let isShiftDown = false;
       let isCtrlDown = false;
-      let highlighted = null;
-      let lastMousePosition = { x: 0, y: 0 };
-      let accumulatedMovement = { x: 0, y: 0, z: 0 };
       const rigidBodies = [];
-      const collisionMargin = 0.05;
-      const GRID_SIZE = 1.5;
-      
-      // Multi-selection movement variables
-      let multiSelectionActive = false;
-      let selectedObjectsInitialPositions = new Map();
-      
-      // Debug and collision variables
       let showCollisionDebug = false;
       let collisionEnabled = true;
+      let multiSelectionActive = false;
 
- class RigidBody {
+      // Undo system
+      const undoStack = [];
+      const MAX_UNDO_STEPS = 20;
+
+      function saveUndoState(action, objects) {
+        const state = {
+          action: action,
+          objects: objects.map(obj => ({
+            object: obj,
+            position: obj.position.clone(),
+            rotation: obj.rotation.clone(),
+            scale: obj.scale.clone()
+          })),
+          timestamp: Date.now()
+        };
+        
+        undoStack.push(state);
+        if (undoStack.length > MAX_UNDO_STEPS) {
+          undoStack.shift();
+        }
+        
+        console.log(`Saved undo state: ${action}, objects: ${objects.length}`);
+      }
+
+      function performUndo() {
+        if (undoStack.length === 0) {
+          console.log('No undo states available');
+          return;
+        }
+
+        const lastState = undoStack.pop();
+        console.log(`Undoing: ${lastState.action}`);
+
+        if (lastState.action === 'delete') {
+          // Restore deleted objects
+          lastState.objects.forEach(objData => {
+            if (!objData.object.parent) { // Only add if not already in scene
+              scene.add(objData.object);
+              addRigidBody(objData.object);
+              objData.object.position.copy(objData.position);
+              objData.object.rotation.copy(objData.rotation);
+              objData.object.scale.copy(objData.scale);
+            }
+          });
+        } else if (lastState.action === 'move' || lastState.action === 'spawn') {
+          // Restore previous positions
+          lastState.objects.forEach(objData => {
+            if (objData.object.parent === scene) { // Make sure object still exists
+              objData.object.position.copy(objData.position);
+              objData.object.rotation.copy(objData.rotation);
+              objData.object.scale.copy(objData.scale);
+            }
+          });
+        } else if (lastState.action === 'spawn') {
+          // For spawn actions, remove the spawned objects
+          lastState.objects.forEach(objData => {
+            if (objData.object.parent === scene) {
+              scene.remove(objData.object);
+              const rbIndex = rigidBodies.findIndex(rb => rb.object === objData.object);
+              if (rbIndex !== -1) {
+                rigidBodies[rbIndex].destroy();
+                rigidBodies.splice(rbIndex, 1);
+              }
+            }
+          });
+        }
+
+        selectedObjects.clear();
+        currentGrabbed = null;
+        multiSelectionActive = false;
+        controls.enabled = true;
+        updateSelection();
+      }
+
+      // FIXED: Movement tracking variables
+      let dragStartMousePos = { x: 0, y: 0 }; // Mouse position when drag started
+      let dragStartObjectPos = { x: 0, y: 0, z: 0 }; // Object position when drag started
+      let clickOffset = { x: 0, y: 0, z: 0 }; // Offset from click point to object center
+
+      class CollisionBox {
         constructor(object) {
           this.object = object;
-          this.boundingBox = new THREE.Box3();
+          this.box = new THREE.Box3();
           this.debugMesh = null;
-          this.showDebug = false;
-          this.meshGeometries = [];
-          this.extractMeshGeometry();
           this.updateBoundingBox();
-        }
-
-        extractMeshGeometry() {
-          this.meshGeometries = [];
-          this.object.traverse((child) => {
-            if (child.isMesh && child.geometry) {
-              this.meshGeometries.push({
-                mesh: child,
-                geometry: child.geometry.clone(),
-                originalGeometry: child.geometry
-              });
-            }
-          });
-        }
-
-        createDebugVisualization() {
-          this.removeDebugVisualization();
-          if (!this.showDebug) return;
-
-          this.debugMesh = [];
-
-          this.object.traverse((child) => {
-            if (child.isMesh && child.geometry) {
-              const wfGeo = new THREE.WireframeGeometry(child.geometry);
-              const wfMat = new THREE.LineBasicMaterial({
-                color: 0x00ff00,
-                transparent: true,
-                opacity: 0.8
-              });
-              const wf = new THREE.LineSegments(wfGeo, wfMat);
-              wf.name = '__rb_debug__';
-
-              // Parent to mesh so it inherits transform
-              child.add(wf);
-
-              this.debugMesh.push(wf);
-            }
-          });
-        }
-
-        removeDebugVisualization() {
-          if (Array.isArray(this.debugMesh)) {
-            for (const wf of this.debugMesh) {
-              if (wf.parent) wf.parent.remove(wf);
-              wf.geometry?.dispose?.();
-              wf.material?.dispose?.();
-            }
-          }
-          this.debugMesh = null;
         }
 
         updateBoundingBox() {
           this.object.updateMatrixWorld(true);
-          this.boundingBox.setFromObject(this.object);
+          this.box.setFromObject(this.object);
+          this.box.expandByScalar(0.1);
         }
 
-        toggleDebugVisualization() {
-          this.showDebug = !this.showDebug;
-          if (this.showDebug) this.createDebugVisualization();
-          else this.removeDebugVisualization();
+        createDebugVisualization() {
+          this.removeDebugVisualization();
+          if (!showCollisionDebug) return;
+          const size = this.box.getSize(new THREE.Vector3());
+          const center = this.box.getCenter(new THREE.Vector3());
+          const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+          const material = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true, transparent: true, opacity: 0.8 });
+          this.debugMesh = new THREE.Mesh(geometry, material);
+          this.debugMesh.position.copy(center);
+          this.debugMesh.name = '__collision_debug__';
+          scene.add(this.debugMesh);
         }
 
-        // Check collision using raycasting against actual mesh geometry
-        checkCollisionWith(other) {
-          if (other === this) return false;
-          
-          // Quick bounding box check first
-          const expandedBox = this.boundingBox.clone();
-          expandedBox.expandByScalar(collisionMargin);
-          if (!expandedBox.intersectsBox(other.boundingBox)) {
-            return false;
+        removeDebugVisualization() {
+          if (this.debugMesh) {
+            scene.remove(this.debugMesh);
+            this.debugMesh.geometry?.dispose();
+            this.debugMesh.material?.dispose();
+            this.debugMesh = null;
           }
-          
-          // Use raycasting to check if objects actually intersect
-          return this.meshIntersectsWithOther(other);
         }
 
-        meshIntersectsWithOther(other) {
-          const raycaster = new THREE.Raycaster();
-          
-          // Sample points around this object's bounding box
-          const thisBox = this.boundingBox;
-          const thisCenter = thisBox.getCenter(new THREE.Vector3());
-          const thisSize = thisBox.getSize(new THREE.Vector3());
-          
-          // Create sample points
-          const samplePoints = [];
-          const samples = 8;
-          
-          for (let i = 0; i < samples; i++) {
-            for (let j = 0; j < samples; j++) {
-              const x = thisCenter.x + (i / (samples - 1) - 0.5) * thisSize.x;
-              const y = thisCenter.y + (j / (samples - 1) - 0.5) * thisSize.y;
-              const z = thisCenter.z;
-              samplePoints.push(new THREE.Vector3(x, y, z));
-            }
-          }
-          
-          // Check if any sample points are inside the other object
-          for (let point of samplePoints) {
-            // Cast rays in multiple directions from each point
-            const directions = [
-              new THREE.Vector3(1, 0, 0),
-              new THREE.Vector3(-1, 0, 0),
-              new THREE.Vector3(0, 1, 0),
-              new THREE.Vector3(0, -1, 0),
-              new THREE.Vector3(0, 0, 1),
-              new THREE.Vector3(0, 0, -1)
-            ];
-            
-            for (let direction of directions) {
-              raycaster.set(point, direction);
-              
-              let intersectionCount = 0;
-              other.object.traverse((child) => {
-                if (child.isMesh) {
-                  const intersects = raycaster.intersectObject(child, false);
-                  intersectionCount += intersects.length;
-                }
-              });
-              
-              // If odd number of intersections, point is inside mesh
-              if (intersectionCount % 2 === 1) {
-                return true;
-              }
-            }
-          }
-          
-          return false;
+        intersectsWith(other) {
+          return this.box.intersectsBox(other.box);
         }
 
         destroy() {
@@ -407,311 +358,215 @@
         }
       }
 
+      function addRigidBody(object) {
+        const rb = new CollisionBox(object);
+        rigidBodies.push(rb);
+        if (showCollisionDebug) rb.createDebugVisualization();
+        return rb;
+      }
+
       function snapToGrid(value) {
         return Math.round(value / GRID_SIZE) * GRID_SIZE;
       }
 
+      function snapToGridY(value) {
+        return Math.round(value / GRID_SIZEy) * GRID_SIZEy;
+      }
+
       function highlightObject(obj, color = 0x3399ff) {
-        if (obj) {
-          obj.traverse((o) => {
-            if (o.isMesh) {
-              if (!o.material.userData.originalEmissive) {
-                o.material.userData.originalEmissive = o.material.emissive.clone();
-              }
+        if (!obj) return;
+        obj.traverse((o) => {
+          if (o.isMesh) {
+            if (!o.material.userData.originalEmissive) {
+              o.material.userData.originalEmissive = o.material.emissive?.clone() || new THREE.Color(0x000000);
+            }
+            if (o.material.emissive) {
               o.material.emissive.setHex(color);
             }
-          });
-        }
+          }
+        });
       }
 
       function unhighlightObject(obj) {
-        if (obj) {
-          obj.traverse((o) => {
-            if (o.isMesh && o.material?.userData?.originalEmissive) {
+        if (!obj) return;
+        obj.traverse((o) => {
+          if (o.isMesh && o.material?.userData?.originalEmissive) {
+            if (o.material.emissive) {
               o.material.emissive.copy(o.material.userData.originalEmissive);
             }
-          });
-        }
+          }
+        });
       }
 
       function updateSelection() {
-        // Clear all highlights first
         scene.children.forEach(obj => {
           if (obj !== ground && obj.isGroup) {
             unhighlightObject(obj);
           }
         });
 
-        // Highlight selected objects
         selectedObjects.forEach(obj => {
-          highlightObject(obj, 0xff6600); // Orange for selected
+          highlightObject(obj, 0xff6600);
         });
 
-        // Highlight grabbed object differently
         if (currentGrabbed) {
-          highlightObject(currentGrabbed, 0x3399ff); // Blue for grabbed
+          highlightObject(currentGrabbed, 0x3399ff);
         }
 
-        // Update UI
         document.getElementById('selected-count').textContent = selectedObjects.size;
       }
 
-      function addToSelection(obj) {
-        selectedObjects.add(obj);
-        updateSelection();
-      }
-
-      function removeFromSelection(obj) {
-        selectedObjects.delete(obj);
-        updateSelection();
-      }
-
-      function clearSelection() {
-        selectedObjects.clear();
-        updateSelection();
-      }
-
-function resolveGrabbedCollisions() {
-  if (!currentGrabbed || !collisionEnabled) return;
-
-  const grabbedBody = rigidBodies.find(b => b.object === currentGrabbed);
-  if (!grabbedBody) return;
-
-  grabbedBody.updateBoundingBox();
-
-  // Ground collision
-  const minY = grabbedBody.boundingBox.min.y;
-  if (minY < 0) {
-    currentGrabbed.position.y += -minY;
-    grabbedBody.updateBoundingBox();
-  }
-
-  // Object collisions
-  for (let other of rigidBodies) {
-    if (other.object === currentGrabbed) continue;
-
-    if (grabbedBody.boundingBox.intersectsBox(other.boundingBox)) {
-      const thisBox = grabbedBody.boundingBox;
-      const otherBox = other.boundingBox;
-
-      const overlapX = Math.min(thisBox.max.x, otherBox.max.x) - Math.max(thisBox.min.x, otherBox.min.x);
-      const overlapY = Math.min(thisBox.max.y, otherBox.max.y) - Math.max(thisBox.min.y, otherBox.min.y);
-      const overlapZ = Math.min(thisBox.max.z, otherBox.max.z) - Math.max(thisBox.min.z, otherBox.min.z);
-
-      // Pick smallest axis overlap to push away
-      if (overlapX < overlapY && overlapX < overlapZ) {
-        const dir = (thisBox.getCenter(new THREE.Vector3()).x < otherBox.getCenter(new THREE.Vector3()).x) ? -1 : 1;
-        currentGrabbed.position.x += overlapX * dir;
-      } else if (overlapY < overlapX && overlapY < overlapZ) {
-        const dir = (thisBox.getCenter(new THREE.Vector3()).y < otherBox.getCenter(new THREE.Vector3()).y) ? -1 : 1;
-        currentGrabbed.position.y += overlapY * dir;
-      } else {
-        const dir = (thisBox.getCenter(new THREE.Vector3()).z < otherBox.getCenter(new THREE.Vector3()).z) ? -1 : 1;
-        currentGrabbed.position.z += overlapZ * dir;
-      }
-
-      // Snap to grid
-      currentGrabbed.position.x = snapToGrid(currentGrabbed.position.x);
-      currentGrabbed.position.y = snapToGrid(currentGrabbed.position.y);
-      currentGrabbed.position.z = snapToGrid(currentGrabbed.position.z);
-
-      grabbedBody.updateBoundingBox();
-    }
-  }
-}
-
-
-      function resolveObjectCollisions(targetObject) {
+      function resolveCollisions(targetObject) {
         if (!collisionEnabled) return;
-        
         const targetBody = rigidBodies.find(b => b.object === targetObject);
         if (!targetBody) return;
 
         targetBody.updateBoundingBox();
 
-        // Ground collision
-        const minY = targetBody.boundingBox.min.y;
-        const groundY = 0;
-        if (minY < groundY) {
-          const offset = groundY - minY;
-          targetObject.position.y += offset;
+        const minY = targetBody.box.min.y;
+        if (minY < 0) {
+          targetObject.position.y += Math.abs(minY);
           targetBody.updateBoundingBox();
         }
 
-        // Object collisions - simplified approach
-        for (let other of rigidBodies) {
-          if (other.object === targetObject) continue;
+        for (let otherBody of rigidBodies) {
+          if (otherBody.object === targetObject) continue;
+          if (targetBody.intersectsWith(otherBody)) {
+            const targetCenter = targetBody.box.getCenter(new THREE.Vector3());
+            const otherCenter = otherBody.box.getCenter(new THREE.Vector3());
+            const separation = targetCenter.clone().sub(otherCenter);
+            if (separation.length() < 0.1) separation.set(1, 0, 0);
+            separation.normalize();
 
-          if (targetBody.checkCollisionWith(other)) {
-            const thisBox = targetBody.boundingBox;
-            const otherBox = other.boundingBox;
-
-            const thisCenter = thisBox.getCenter(new THREE.Vector3());
-            const otherCenter = otherBox.getCenter(new THREE.Vector3());
-            
-            // Calculate push direction
-            const pushDirection = thisCenter.clone().sub(otherCenter).normalize();
-            
-            if (pushDirection.length() < 0.1) {
-              pushDirection.set(1, 0, 0);
-            }
-            
-            // Calculate minimum separation distance
-            const thisSize = thisBox.getSize(new THREE.Vector3());
-            const otherSize = otherBox.getSize(new THREE.Vector3());
-            const minDistance = Math.max(thisSize.length(), otherSize.length()) * 0.6;
-            
-            // Push object away
-            const targetPos = otherCenter.clone().add(pushDirection.multiplyScalar(minDistance));
-            const displacement = targetPos.sub(thisCenter);
-            
-            targetObject.position.add(displacement);
-            
-            // Snap to grid
+            const pushDistance = GRID_SIZE * 2;
+            const pushVector = separation.multiplyScalar(pushDistance);
+            targetObject.position.add(pushVector);
             targetObject.position.x = snapToGrid(targetObject.position.x);
-            targetObject.position.y = snapToGrid(targetObject.position.y);
             targetObject.position.z = snapToGrid(targetObject.position.z);
-
             targetBody.updateBoundingBox();
             break;
           }
         }
       }
 
-      // Mouse Controls
+      // FIXED: Mouse movement handler
       window.addEventListener("mousemove", (e) => {
         const objectsToMove = currentGrabbed ? [currentGrabbed] : 
                              (multiSelectionActive ? Array.from(selectedObjects) : []);
         
         if (objectsToMove.length === 0) return;
 
-        const threshold = 100;
-        const deltaX = e.clientX - lastMousePosition.x;
-        const deltaY = e.clientY - lastMousePosition.y;
+        const currentMouseX = (e.clientX / window.innerWidth) * 2 - 1;
+        const currentMouseY = -(e.clientY / window.innerHeight) * 2 + 1;
 
         if (isShiftDown) {
-          accumulatedMovement.y += deltaY;
+          // FIXED: Y-axis movement with exact 2.6 steps for both single and multi-select
+          const mouseDeltaY = currentMouseY - dragStartMousePos.y;
+          const steps = Math.round(mouseDeltaY * 4); // Sensitivity - adjust if needed
           
-          if (Math.abs(accumulatedMovement.y) >= threshold) {
-            const direction = accumulatedMovement.y > 0 ? -1 : 1;
-            const movement = GRID_SIZE * direction;
-            
+          if (multiSelectionActive) {
+            // Multi-select Y movement - move all objects by the same amount
+            const deltaY = steps * GRID_SIZEy;
             objectsToMove.forEach(obj => {
-              obj.position.y = snapToGrid(obj.position.y + movement);
+              const newY = Math.max(0, obj.userData.originalPos.y + deltaY);
+              obj.position.y = newY;
+              resolveCollisions(obj);
             });
-            
-            accumulatedMovement.y = 0;
-            lastMousePosition.x = e.clientX;
-            lastMousePosition.y = e.clientY;
-            
-            if (currentGrabbed) {
-              resolveGrabbedCollisions();
-            } else {
-              objectsToMove.forEach(obj => resolveObjectCollisions(obj));
-            }
+            console.log(`Multi Y Movement - Steps: ${steps}, Delta Y: ${deltaY}, Objects: ${objectsToMove.length}`);
+          } else {
+            // Single object Y movement
+            const newY = Math.max(0, dragStartObjectPos.y + (steps * GRID_SIZEy));
+            objectsToMove.forEach(obj => {
+              obj.position.y = newY;
+              resolveCollisions(obj);
+            });
+            console.log(`Single Y Movement - Steps: ${steps}, New Y: ${newY}`);
           }
         } else {
-          accumulatedMovement.x += deltaX;
-          accumulatedMovement.z += deltaY;
-
-          const cameraRight = new THREE.Vector3();
-          camera.getWorldDirection(cameraRight);
-          cameraRight.cross(camera.up).normalize();
-
-          const cameraForward = new THREE.Vector3();
-          camera.getWorldDirection(cameraForward);
-          cameraForward.y = 0;
-          cameraForward.normalize();
-
-          if (Math.abs(accumulatedMovement.x) >= threshold) {
-            const direction = accumulatedMovement.x > 0 ? 1 : -1;
-            const moveVector = cameraRight.clone().multiplyScalar(GRID_SIZE * direction);
+          // FIXED: XZ movement with click offset for multi-selection
+          raycaster.setFromCamera(new THREE.Vector2(currentMouseX, currentMouseY), camera);
+          const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -dragStartObjectPos.y);
+          const intersection = new THREE.Vector3();
+          
+          if (raycaster.ray.intersectPlane(plane, intersection)) {
+            const deltaX = intersection.x - clickOffset.x - dragStartObjectPos.x;
+            const deltaZ = intersection.z - clickOffset.z - dragStartObjectPos.z;
             
             objectsToMove.forEach(obj => {
-              obj.position.x = snapToGrid(obj.position.x + moveVector.x);
-              obj.position.z = snapToGrid(obj.position.z + moveVector.z);
+              if (obj === currentGrabbed) {
+                obj.position.x = intersection.x - clickOffset.x;
+                obj.position.z = intersection.z - clickOffset.z;
+              } else {
+                // For multi-selected objects, move relative to the main object
+                obj.position.x = obj.userData.originalPos.x + deltaX;
+                obj.position.z = obj.userData.originalPos.z + deltaZ;
+              }
+              resolveCollisions(obj);
             });
-            
-            accumulatedMovement.x = 0;
-            lastMousePosition.x = e.clientX;
-            
-            if (currentGrabbed) {
-              resolveGrabbedCollisions();
-            } else {
-              objectsToMove.forEach(obj => resolveObjectCollisions(obj));
-            }
-          }
-
-          if (Math.abs(accumulatedMovement.z) >= threshold) {
-            const direction = accumulatedMovement.z > 0 ? -1 : 1;
-            const moveVector = cameraForward.clone().multiplyScalar(GRID_SIZE * direction);
-            
-            objectsToMove.forEach(obj => {
-              obj.position.x = snapToGrid(obj.position.x + moveVector.x);
-              obj.position.z = snapToGrid(obj.position.z + moveVector.z);
-            });
-            
-            accumulatedMovement.z = 0;
-            lastMousePosition.y = e.clientY;
-            
-            if (currentGrabbed) {
-              resolveGrabbedCollisions();
-            } else {
-              objectsToMove.forEach(obj => resolveObjectCollisions(obj));
-            }
           }
         }
       });
 
+      // Mouse wheel for Y movement
       window.addEventListener("wheel", (e) => {
         const objectsToMove = currentGrabbed ? [currentGrabbed] : 
                              (multiSelectionActive ? Array.from(selectedObjects) : []);
-                             
-        if (objectsToMove.length > 0) {
-          e.preventDefault();
-          const direction = e.deltaY > 0 ? -1 : 1;
-          const movement = GRID_SIZE * direction;
-          
-          objectsToMove.forEach(obj => {
-            obj.position.y = snapToGrid(obj.position.y + movement);
-          });
-          
-          if (currentGrabbed) {
-            resolveGrabbedCollisions();
-          } else {
-            objectsToMove.forEach(obj => resolveObjectCollisions(obj));
-          }
-        }
+        
+        if (objectsToMove.length === 0) return;
+        
+        e.preventDefault();
+        const direction = e.deltaY > 0 ? -1 : 1;
+        
+        objectsToMove.forEach(obj => {
+          const newY = Math.max(0, obj.position.y + (direction * GRID_SIZEy));
+          obj.position.y = newY;
+          resolveCollisions(obj);
+        });
+        
+        console.log(`Wheel Y Movement - Objects moved: ${objectsToMove.length}`); // Debug log
       });
 
-      function addRigidBody(object) {
-        const rb = new RigidBody(object);
-        rigidBodies.push(rb);
-        return rb;
-      }
-
+      // FIXED: Click handler
       window.addEventListener("click", (e) => {
-        // Skip if clicking on UI elements
         if (e.target.closest('#sidebar') || e.target.closest('#multi-controls') || e.target.closest('#gizmo-container')) {
           return;
         }
 
         if (currentGrabbed || multiSelectionActive) {
+          // Save undo state before dropping
+          const objectsToSave = currentGrabbed ? [currentGrabbed] : Array.from(selectedObjects);
+          saveUndoState('move', objectsToSave);
+          
+          // Drop objects and snap to grid
+          const objectsToSnap = currentGrabbed ? [currentGrabbed] : Array.from(selectedObjects);
+          objectsToSnap.forEach(obj => {
+            obj.position.x = snapToGrid(obj.position.x);
+            obj.position.y = snapToGridY(obj.position.y);
+            obj.position.z = snapToGrid(obj.position.z);
+            // Clear original position data
+            if (obj.userData.originalPos) {
+              delete obj.userData.originalPos;
+            }
+          });
+          
           currentGrabbed = null;
           multiSelectionActive = false;
-          isShiftDown = false;
-          accumulatedMovement = { x: 0, y: 0, z: 0 };
-          selectedObjectsInitialPositions.clear();
+          controls.enabled = true;
           updateSelection();
         } else {
+          // Try to grab object
           const x = (e.clientX / window.innerWidth) * 2 - 1;
           const y = -(e.clientY / window.innerHeight) * 2 + 1;
           mouse.set(x, y);
           raycaster.setFromCamera(mouse, camera);
 
           const hits = raycaster.intersectObjects(scene.children, true);
-          if (hits.length > 0 && hits[0].object !== ground) {
-            let target = hits[0].object;
+          const validHits = hits.filter(hit => 
+            hit.object !== ground && !hit.object.name.includes('debug')
+          );
+          
+          if (validHits.length > 0) {
+            let target = validHits[0].object;
             while (target.parent && target.parent !== scene) {
               target = target.parent;
             }
@@ -719,154 +574,214 @@ function resolveGrabbedCollisions() {
             if (e.shiftKey) {
               // Multi-selection mode
               if (selectedObjects.has(target)) {
-                removeFromSelection(target);
+                selectedObjects.delete(target);
               } else {
-                addToSelection(target);
+                selectedObjects.add(target);
               }
+              updateSelection();
             } else {
-              // Check if clicked object is in selection
+              // Check if clicking on selected object to start multi-move
               if (selectedObjects.has(target) && selectedObjects.size > 1) {
                 // Start multi-selection movement
                 multiSelectionActive = true;
+                controls.enabled = false;
                 
-                // Store initial positions
+                // Store original positions for all selected objects
                 selectedObjects.forEach(obj => {
-                  selectedObjectsInitialPositions.set(obj, obj.position.clone());
+                  obj.userData.originalPos = {
+                    x: obj.position.x,
+                    y: obj.position.y,
+                    z: obj.position.z
+                  };
                 });
                 
-                lastMousePosition.x = e.clientX;
-                lastMousePosition.y = e.clientY;
-                accumulatedMovement = { x: 0, y: 0, z: 0 };
+                // FIXED: Calculate click offset from exact hit point
+                const hitPoint = validHits[0].point;
+                clickOffset.x = hitPoint.x - target.position.x;
+                clickOffset.y = 0;
+                clickOffset.z = hitPoint.z - target.position.z;
                 
-                updateSelection();
+                // Store initial positions
+                dragStartMousePos.x = x;
+                dragStartMousePos.y = y;
+                dragStartObjectPos.x = target.position.x;
+                dragStartObjectPos.y = target.position.y;
+                dragStartObjectPos.z = target.position.z;
+                
+                console.log(`Started multi-move with ${selectedObjects.size} objects`);
               } else {
-                // Single grab mode
-                clearSelection();
-                currentGrabbed = target;
+                // Single object grab
+                // FIXED: Calculate click offset from exact hit point
+                const hitPoint = validHits[0].point;
+                clickOffset.x = hitPoint.x - target.position.x;
+                clickOffset.y = 0; // Don't offset Y
+                clickOffset.z = hitPoint.z - target.position.z;
                 
-                currentGrabbed.position.x = snapToGrid(currentGrabbed.position.x);
-                currentGrabbed.position.y = snapToGrid(currentGrabbed.position.y);
-                currentGrabbed.position.z = snapToGrid(currentGrabbed.position.z);
+                // Store initial positions
+                dragStartMousePos.x = x;
+                dragStartMousePos.y = y;
+                dragStartObjectPos.x = target.position.x;
+                dragStartObjectPos.y = target.position.y;
+                dragStartObjectPos.z = target.position.z;
 
-                lastMousePosition.x = e.clientX;
-                lastMousePosition.y = e.clientY;
-                accumulatedMovement = { x: 0, y: 0, z: 0 };
-
-                updateSelection();
-                resolveGrabbedCollisions();
+                selectedObjects.clear();
+                currentGrabbed = target;
+                controls.enabled = false;
+                
+                console.log(`Grabbed object at: ${target.position.x}, ${target.position.y}, ${target.position.z}`);
+                console.log(`Click offset: ${clickOffset.x}, ${clickOffset.z}`);
               }
+              
+              updateSelection();
             }
           } else if (!e.shiftKey) {
-            clearSelection();
+            selectedObjects.clear();
+            updateSelection();
           }
         }
       });
 
-      // Enhanced Keyboard Controls
+      // Keyboard controls
       window.addEventListener("keydown", (e) => {
-        if (e.key === "Shift") {
-          isShiftDown = true;
-        }
-        if (e.key === "Control" || e.key === "Meta") {
-          isCtrlDown = true;
+        if (e.key === "Shift") isShiftDown = true;
+        if (e.key === "Control" || e.key === "Meta") isCtrlDown = true;
+
+        // Undo with Ctrl+Z
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          performUndo();
+          return;
         }
 
-        // Enhanced rotation with X-axis support
         if (e.key.toLowerCase() === "r") {
           const objectsToRotate = currentGrabbed ? [currentGrabbed] : Array.from(selectedObjects);
           
-          objectsToRotate.forEach(obj => {
-            if (e.ctrlKey || e.metaKey) {
-              // Rotate around X axis when holding Ctrl/Cmd
-              obj.rotation.y += Math.PI / 2;
-              obj.rotation.y = Math.round(obj.rotation.y / (Math.PI / 2)) * (Math.PI / 2);
-            } else if (e.shiftKey) {
-              // Rotate around Z axis when holding Shift
-              obj.rotation.z += Math.PI / 2;
-              obj.rotation.z = Math.round(obj.rotation.z / (Math.PI / 2)) * (Math.PI / 2);
-            } else {
-              // Rotate around Y axis (default)
-              obj.rotation.x += Math.PI / 2;
-              obj.rotation.x = Math.round(obj.rotation.x / (Math.PI / 2)) * (Math.PI / 2);
-            }
-          });
-
-          if (currentGrabbed) {
-            resolveGrabbedCollisions();
+          if (objectsToRotate.length > 0) {
+            saveUndoState('move', objectsToRotate);
+            
+            objectsToRotate.forEach(obj => {
+              if (e.ctrlKey || e.metaKey) {
+                obj.rotation.y += Math.PI / 2;
+              } else if (e.shiftKey) {
+                obj.rotation.z += Math.PI / 2;
+              } else {
+                obj.rotation.x += Math.PI / 2;
+              }
+              resolveCollisions(obj);
+            });
           }
         }
 
-        // Delete selected objects
         if (e.key === "Delete" || e.key === "Backspace") {
           const objectsToDelete = currentGrabbed ? [currentGrabbed] : Array.from(selectedObjects);
           
-          objectsToDelete.forEach(obj => {
-            scene.remove(obj);
-            const rbIndex = rigidBodies.findIndex(rb => rb.object === obj);
-            if (rbIndex !== -1) {
-              rigidBodies.splice(rbIndex, 1);
-            }
-            selectedObjects.delete(obj);
-            if (obj === currentGrabbed) {
-              currentGrabbed = null;
-            }
-          });
+          if (objectsToDelete.length > 0) {
+            saveUndoState('delete', objectsToDelete);
+            
+            objectsToDelete.forEach(obj => {
+              scene.remove(obj);
+              const rbIndex = rigidBodies.findIndex(rb => rb.object === obj);
+              if (rbIndex !== -1) {
+                rigidBodies[rbIndex].destroy();
+                rigidBodies.splice(rbIndex, 1);
+              }
+              selectedObjects.delete(obj);
+            });
+            
+            currentGrabbed = null;
+            multiSelectionActive = false;
+            controls.enabled = true;
+            updateSelection();
+          }
+        }
 
+        if (e.key === "Escape") {
+          currentGrabbed = null;
+          multiSelectionActive = false;
+          selectedObjects.clear();
+          controls.enabled = true;
           updateSelection();
         }
       });
 
       window.addEventListener("keyup", (e) => {
-        if (e.key === "Shift") {
-          isShiftDown = false;
-        }
-        if (e.key === "Control" || e.key === "Meta") {
-          isCtrlDown = false;
-        }
+        if (e.key === "Shift") isShiftDown = false;
+        if (e.key === "Control" || e.key === "Meta") isCtrlDown = false;
       });
 
       // Debug controls
-      document.getElementById('toggle-debug').addEventListener('click', () => {
-        showCollisionDebug = !showCollisionDebug;
-        const btn = document.getElementById('toggle-debug');
-        btn.textContent = showCollisionDebug ? 'Hide Collision Mesh' : 'Show Collision Mesh';
-        
-        rigidBodies.forEach(rb => {
-          rb.showDebug = showCollisionDebug;
-          if (showCollisionDebug) {
-            rb.createDebugVisualization();
-          } else {
-            rb.removeDebugVisualization();
-          }
+      const toggleDebugBtn = document.getElementById('toggle-debug');
+      if (toggleDebugBtn) {
+        toggleDebugBtn.addEventListener('click', () => {
+          showCollisionDebug = !showCollisionDebug;
+          toggleDebugBtn.textContent = showCollisionDebug ? 'Hide Collision Box' : 'Show Collision Box';
+          rigidBodies.forEach(rb => {
+            if (showCollisionDebug) {
+              rb.createDebugVisualization();
+            } else {
+              rb.removeDebugVisualization();
+            }
+          });
         });
-      });
+      }
 
-      document.getElementById('disable-collision').addEventListener('click', () => {
-        collisionEnabled = !collisionEnabled;
-        const btn = document.getElementById('disable-collision');
-        btn.textContent = collisionEnabled ? 'Disable Collision' : 'Enable Collision';
-      });
+      const disableCollisionBtn = document.getElementById('disable-collision');
+      if (disableCollisionBtn) {
+        disableCollisionBtn.addEventListener('click', () => {
+          collisionEnabled = !collisionEnabled;
+          disableCollisionBtn.textContent = collisionEnabled ? 'Disable Collision' : 'Enable Collision';
+        });
+      }
 
-      // Multi-selection controls
-      document.getElementById('clear-selection').addEventListener('click', clearSelection);
+      const clearSelectionBtn = document.getElementById('clear-selection');
+      if (clearSelectionBtn) {
+        clearSelectionBtn.addEventListener('click', () => {
+          selectedObjects.clear();
+          currentGrabbed = null;
+          multiSelectionActive = false;
+          controls.enabled = true;
+          updateSelection();
+        });
+      }
       
-      document.getElementById('delete-selected').addEventListener('click', () => {
-        Array.from(selectedObjects).forEach(obj => {
-          scene.remove(obj);
-          const rbIndex = rigidBodies.findIndex(rb => rb.object === obj);
-          if (rbIndex !== -1) {
-            rigidBodies.splice(rbIndex, 1);
+      const deleteSelectedBtn = document.getElementById('delete-selected');
+      if (deleteSelectedBtn) {
+        deleteSelectedBtn.addEventListener('click', () => {
+          const objectsToDelete = Array.from(selectedObjects);
+          if (objectsToDelete.length > 0) {
+            saveUndoState('delete', objectsToDelete);
+            
+            objectsToDelete.forEach(obj => {
+              scene.remove(obj);
+              const rbIndex = rigidBodies.findIndex(rb => rb.object === obj);
+              if (rbIndex !== -1) {
+                rigidBodies[rbIndex].destroy();
+                rigidBodies.splice(rbIndex, 1);
+              }
+            });
           }
+          selectedObjects.clear();
+          currentGrabbed = null;
+          multiSelectionActive = false;
+          controls.enabled = true;
+          updateSelection();
         });
-        clearSelection();
-      });
+      }
+
+      const undoBtn = document.getElementById('undo-btn');
+      if (undoBtn) {
+        undoBtn.addEventListener('click', () => {
+          performUndo();
+        });
+      }
 
       // Model spawning
       const gltfLoader = new THREE.GLTFLoader();
-      document.querySelectorAll(".part-btn").forEach((btn) => {
+      const partButtons = document.querySelectorAll(".part-btn");
+      
+      partButtons.forEach((btn) => {
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
-          
           if (currentGrabbed) return;
 
           const file = btn.dataset.model;
@@ -876,104 +791,124 @@ function resolveGrabbedCollisions() {
 
             model.traverse((o) => {
               if (o.isMesh) {
-                o.castShadow = false;
-                o.receiveShadow = false;
-                if (o.material) o.material.side = THREE.FrontSide;
+                o.castShadow = true;
+                o.receiveShadow = true;
+                if (o.material) {
+                  o.material.side = THREE.FrontSide;
+                  if (!o.material.emissive) {
+                    o.material.emissive = new THREE.Color(0x000000);
+                  }
+                }
               }
             });
 
-            model.position.set(
-              snapToGrid(Math.random() * 10 - 2), 
-              snapToGrid(10), 
-              snapToGrid(Math.random() * 10 - 2)
-            );
+            // Save undo state before spawning (save empty state since object doesn't exist yet)
+            const tempUndoState = {
+              action: 'spawn',
+              objects: [], // Will be filled after object is created
+              timestamp: Date.now()
+            };
+            
+            model.position.set(0, GRID_SIZEy * 2, 0); // Spawn at Y = 5.2
             scene.add(model);
-
-            const rb = addRigidBody(model);
-            if (showCollisionDebug) {
-              rb.showDebug = true;
-              rb.createDebugVisualization();
+            addRigidBody(model);
+            
+            // Now save the actual undo state with the created object
+            tempUndoState.objects = [{
+              object: model,
+              position: new THREE.Vector3(0, 0, 0), // Original spawn position would be (0,0,0) conceptually
+              rotation: new THREE.Euler(0, 0, 0),
+              scale: new THREE.Vector3(1, 1, 1)
+            }];
+            undoStack.push(tempUndoState);
+            if (undoStack.length > MAX_UNDO_STEPS) {
+              undoStack.shift();
             }
             
-            clearSelection();
+            // Auto-grab new object
+            selectedObjects.clear();
             currentGrabbed = model;
+            controls.enabled = false;
             
-            lastMousePosition.x = window.innerWidth / 2;
-            lastMousePosition.y = window.innerHeight / 2;
-            accumulatedMovement = { x: 0, y: 0, z: 0 };
-
+            // Initialize drag variables
+            dragStartMousePos.x = 0;
+            dragStartMousePos.y = 0;
+            dragStartObjectPos = { x: model.position.x, y: model.position.y, z: model.position.z };
+            clickOffset = { x: 0, y: 0, z: 0 };
+            
             updateSelection();
-            resolveGrabbedCollisions();
+            resolveCollisions(model);
+          }, undefined, (error) => {
+            console.warn(`Could not load model: ${file}`, error);
           });
         });
       });
 
-      // Resize
-      window.addEventListener("resize", () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
-
-      // Function to collect objects (only top-level groups, not meshes)
-      function getSceneObjects(scene) {
+      // Export functionality
+      function getSceneObjects() {
         const objects = [];
         scene.children.forEach((obj) => {
-          // Skip ground and lights
-          if (obj === ground || obj.isLight || obj.isCamera) return;
-          // Only export groups (GLTF models are groups)
-          if (obj.isGroup) {
+          if (obj !== ground && obj.isGroup && !obj.name.includes('debug')) {
             objects.push({
               name: obj.name || obj.children[0]?.name || "Unnamed",
               position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
               rotation: { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z },
               scale: { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z },
-              model: obj.children[0]?.name || "Unknown", // Use the first mesh's name as model identifier
+              model: obj.children[0]?.name || "Unknown"
             });
           }
         });
         return objects;
       }
 
-      // Function to export and download
-      function exportToJSON(scene) {
-        const objects = getSceneObjects(scene);
+      function exportToJSON() {
+        const objects = getSceneObjects();
         const jsonData = JSON.stringify(objects, null, 2);
         const blob = new Blob([jsonData], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'scene_export.json';
+        a.download = 'lego_scene.json';
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }
 
-      // Add event listener to save button
-      document.getElementById('saveBtn').addEventListener('click', () => {
-        exportToJSON(scene);
-      });
+      const saveBtn = document.getElementById('saveBtn');
+      if (saveBtn) {
+        saveBtn.addEventListener('click', exportToJSON);
+      }
 
-      // Animation loop
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+ 
       function animate() {
         requestAnimationFrame(animate);
-        controls.update();
+        if (controls.enabled) controls.update();
         
-        // Update gizmo rotation to match main camera
-        gizmoCube.rotation.copy(camera.rotation);
-        gizmoCube.rotation.x *= -1;
-        gizmoCube.rotation.y *= -1;
+        const quaternion = new THREE.Quaternion();
+        quaternion.setFromRotationMatrix(camera.matrixWorld);
+        gizmoCube.quaternion.copy(quaternion);
         
-        // Render both scenes
+        if (showCollisionDebug) {
+          rigidBodies.forEach(rb => {
+            rb.updateBoundingBox();
+            if (rb.debugMesh) {
+              rb.removeDebugVisualization();
+              rb.createDebugVisualization();
+            }
+          });
+        }
+        
         renderer.render(scene, camera);
         gizmoRenderer.render(gizmoScene, gizmoCamera);
       }
       
       animate();
     </script>
-    
-    <!-- Three.js CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
   </body>
 </html>
