@@ -112,27 +112,27 @@
       <button class="part-btn" data-model="Beam_11.glb">Beam_11</button>
       <button class="part-btn" data-model="Beam_13.glb">Beam_13</button>
       <button class="part-btn" data-model="Beam_15.glb">Beam_15</button>
+      <button class="part-btn" data-model="3x3_T_Beam.glb">Brick</button>
+      <button class="part-btn" data-model="3x3_Triangle_With_3_Axle_Hole.glb">Wheel</button>
       <button class="part-btn" data-model="peg.glb">peg</button>
       <button class="part-btn" data-model="Wheel_24mm.glb">Wheel_24mm</button>
       <button class="part-btn" data-model="Wheel_30mm.glb">Wheel_30mm</button>
       <button class="part-btn" data-model="4x4_Angled_Beam.glb">4x4_Angled_Beam</button>
-      <button class="part-btn" data-model="2x4_L_beam.glb">2x4_L_Beam</button>
+      <button class="part-btn" data-model="2x4_L_Shaped_Beam.glb">2x4_L_Shaped_Beam</button>
       <button class="part-btn" data-model="7x3_Angled_Beam.glb">7x3_Angled_Beam</button>
       <button class="part-btn" data-model="7x3x3_Angled_Beam_With_Axle_Hole.glb">7x3x3_Angled_Beam_With_Axle_Hole</button>
       <button class="part-btn" data-model="7x5_Block.glb">7x5_Block</button>
       <button class="part-btn" data-model="10x5_Block.glb">10x5_Block</button>
       <button class="part-btn" data-model="11x5_H_block.glb">11x5_H_block</button>
       <button class="part-btn" data-model="5x11_Technic_Plate.glb">5x11_Technic_Plate</button>
-      <button class="part-btn" data-model="15x5_Block.glb">15x5_Block</button>
-      <button class="part-btn" data-model="7x7_Block.glb">7x7_Block</button>
-      <button class="part-btn" data-model="14x7_Block.glb">14x7_Block</button>
     </div>
      
     <button id="saveBtn" style="position:absolute; top:10px; right:10px; z-index:10; padding:8px 12px; border:none; border-radius:6px; background:#2d89ef; color:white; font-weight:bold; cursor:pointer;">Save JSON</button>
-     
+    
     <div id="hint">
       Click object to grab from exact point • Hold <code>Shift</code> for Y-axis (2.6 steps)<br/>
-      Mouse wheel for Y movement • <code>R</code> to rotate • Multi-select: <code>Shift+Click</code>
+      Mouse wheel for Y movement • <code>R</code> to rotate • <code>Ctrl+D</code> to duplicate<br/>
+      Multi-select: <code>Shift+Click</code> • <code>Ctrl+Z</code> to undo
     </div>
 
     <script type="module">
@@ -165,10 +165,10 @@
 
       // Grid Constants
       const GRID_SIZE = 0.05;
-      const GRID_SIZEy = 2.6;
+      const GRID_SIZEy = 1.3;
 
       // Ground
-      const groundMat = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, transparent: true, opacity: 0.7 });
+      const groundMat = new THREE.MeshStandardMaterial({ color: 0x232323, transparent: true, opacity: 0.7 });
       const ground = new THREE.Mesh(new THREE.BoxGeometry(40, 0.1, 40), groundMat);
       ground.position.y = -0.05;
       ground.receiveShadow = true;
@@ -278,7 +278,8 @@
               objData.object.scale.copy(objData.scale);
             }
           });
-        } else if (lastState.action === 'move' || lastState.action === 'spawn') {
+          updateObjectCount(); // Update count after restoring objects
+        } else if (lastState.action === 'move') {
           // Restore previous positions
           lastState.objects.forEach(objData => {
             if (objData.object.parent === scene) { // Make sure object still exists
@@ -299,13 +300,14 @@
               }
             }
           });
+          updateObjectCount(); // Update count after removing objects
         }
 
         selectedObjects.clear();
         currentGrabbed = null;
         multiSelectionActive = false;
         controls.enabled = true;
-        updateSelection();
+        updateSelection(); // This will also update the object count
       }
 
       // FIXED: Movement tracking variables
@@ -399,21 +401,148 @@
       }
 
       function updateSelection() {
+        // Clear all highlights first
         scene.children.forEach(obj => {
           if (obj !== ground && obj.isGroup) {
             unhighlightObject(obj);
           }
         });
 
+        // Highlight selected objects
         selectedObjects.forEach(obj => {
-          highlightObject(obj, 0xff6600);
+          // Check if object still exists in scene before highlighting
+          if (obj.parent === scene) {
+            highlightObject(obj, 0xff6600);
+          } else {
+            // Remove from selection if object no longer in scene
+            selectedObjects.delete(obj);
+          }
         });
 
-        if (currentGrabbed) {
+        // Highlight grabbed object
+        if (currentGrabbed && currentGrabbed.parent === scene) {
           highlightObject(currentGrabbed, 0x3399ff);
+        } else if (currentGrabbed && currentGrabbed.parent !== scene) {
+          // Clear grabbed object if it no longer exists
+          currentGrabbed = null;
         }
 
-        document.getElementById('selected-count').textContent = selectedObjects.size;
+        // Update UI
+        const selectedCountElement = document.getElementById('selected-count');
+        if (selectedCountElement) {
+          selectedCountElement.textContent = selectedObjects.size;
+        }
+        
+        console.log(`Selection updated: ${selectedObjects.size} objects selected`);
+      }
+
+      function updateObjectCount() {
+        const objectCount = scene.children.filter(obj => 
+          obj !== ground && 
+          obj.isGroup && 
+          !obj.name.includes('debug') &&
+          !obj.name.includes('__collision_debug__')
+        ).length;
+        
+        const objectCountElement = document.getElementById('object-count');
+        if (objectCountElement) {
+          objectCountElement.textContent = objectCount;
+        }
+        
+        console.log(`Total objects in scene: ${objectCount}`);
+      }
+
+      function duplicateObject(originalObject) {
+        // Create a completely new group instead of cloning
+        const duplicatedObject = new THREE.Group();
+        
+        // Copy all children from original object
+        originalObject.children.forEach(child => {
+          if (child.isMesh) {
+            // Clone geometry and material to make them independent
+            const newGeometry = child.geometry.clone();
+            const newMaterial = child.material.clone();
+            
+            // Ensure material has emissive property for highlighting
+            if (!newMaterial.emissive) {
+              newMaterial.emissive = new THREE.Color(0x000000);
+            }
+            
+            const newMesh = new THREE.Mesh(newGeometry, newMaterial);
+            newMesh.name = child.name + "_duplicated_" + Date.now(); // Unique name
+            newMesh.castShadow = child.castShadow;
+            newMesh.receiveShadow = child.receiveShadow;
+            
+            // Copy transform
+            newMesh.position.copy(child.position);
+            newMesh.rotation.copy(child.rotation);
+            newMesh.scale.copy(child.scale);
+            
+            duplicatedObject.add(newMesh);
+          }
+        });
+
+        // Give the duplicated object a unique name
+        duplicatedObject.name = (originalObject.name || "object") + "_dup_" + Date.now();
+        
+        // Clear userData to make it independent
+        duplicatedObject.userData = {};
+        
+        // Copy transform from original
+        duplicatedObject.position.copy(originalObject.position);
+        duplicatedObject.rotation.copy(originalObject.rotation);
+        duplicatedObject.scale.copy(originalObject.scale);
+
+        // Add to scene
+        scene.add(duplicatedObject);
+        addRigidBody(duplicatedObject);
+        
+        // Resolve collisions to prevent overlapping
+        resolveCollisions(duplicatedObject);
+        
+        console.log(`Created new duplicate object: ${duplicatedObject.name} at: ${duplicatedObject.position.x}, ${duplicatedObject.position.y}, ${duplicatedObject.position.z}`);
+        return duplicatedObject;
+      }
+
+      function duplicateSelectedObjects() {
+        const objectsToDuplicate = currentGrabbed ? [currentGrabbed] : Array.from(selectedObjects);
+        
+        if (objectsToDuplicate.length === 0) {
+          console.log('No objects to duplicate');
+          return;
+        }
+
+        // Save undo state before duplicating
+        const originalObjects = objectsToDuplicate.slice();
+        
+        const duplicatedObjects = [];
+        
+        objectsToDuplicate.forEach(obj => {
+          const duplicated = duplicateObject(obj);
+          duplicatedObjects.push(duplicated);
+        });
+        
+        // Save undo state for the duplication
+        saveUndoState('spawn', duplicatedObjects);
+        
+        // Update object count immediately after duplication
+        updateObjectCount();
+        
+        // FIXED: Completely clear all selections and reset state
+        selectedObjects.clear();
+        currentGrabbed = null;
+        multiSelectionActive = false;
+        controls.enabled = true;
+        
+        // Don't auto-select duplicated objects - let user select them manually
+        updateSelection(); // This will clear all highlights
+        
+        // Force another object count update to ensure UI is correct
+        setTimeout(() => {
+          updateObjectCount();
+        }, 100);
+        
+        console.log(`Successfully duplicated ${duplicatedObjects.length} objects. All selections cleared.`);
       }
 
       function resolveCollisions(targetObject) {
@@ -635,8 +764,13 @@
               updateSelection();
             }
           } else if (!e.shiftKey) {
+            // Click on empty space - clear all selections
             selectedObjects.clear();
+            currentGrabbed = null;
+            multiSelectionActive = false;
+            controls.enabled = true;
             updateSelection();
+            console.log('Cleared all selections');
           }
         }
       });
@@ -650,6 +784,13 @@
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
           e.preventDefault();
           performUndo();
+          return;
+        }
+
+        // Duplicate with Ctrl+D
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          duplicateSelectedObjects();
           return;
         }
 
@@ -692,6 +833,7 @@
             multiSelectionActive = false;
             controls.enabled = true;
             updateSelection();
+            updateObjectCount(); // Update count after deletion
           }
         }
 
@@ -765,6 +907,7 @@
           multiSelectionActive = false;
           controls.enabled = true;
           updateSelection();
+          updateObjectCount(); // Update count after deletion
         });
       }
 
@@ -772,6 +915,13 @@
       if (undoBtn) {
         undoBtn.addEventListener('click', () => {
           performUndo();
+        });
+      }
+
+      const duplicateBtn = document.getElementById('duplicate-selected');
+      if (duplicateBtn) {
+        duplicateBtn.addEventListener('click', () => {
+          duplicateSelectedObjects();
         });
       }
 
@@ -838,6 +988,7 @@
             
             updateSelection();
             resolveCollisions(model);
+            updateObjectCount(); // Update count after adding new object
           }, undefined, (error) => {
             console.warn(`Could not load model: ${file}`, error);
           });
@@ -885,7 +1036,16 @@
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
       });
- 
+
+      // Initialize object count on page load
+      function initializeApp() {
+        updateObjectCount(); // Set initial count to 0
+        updateSelection(); // Set initial selection to 0
+      }
+
+      // Call initialization
+      initializeApp();
+
       function animate() {
         requestAnimationFrame(animate);
         if (controls.enabled) controls.update();
