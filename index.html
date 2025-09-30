@@ -100,28 +100,37 @@
         <button class="control-btn" id="toggle-debug">Show Collision Box</button>
         <button class="control-btn" id="disable-collision">Disable Collision</button>
       </div>
+
+       <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #2c2f3a;">
+        <div>Total Objects: <span id="object-count">0</span></div>
+      </div>
+    
     </div>
 
     <div id="sidebar">
       <h3>Parts</h3>
-      <button class="part-btn" data-model="Beam_2.glb">Beam_2</button>
+     
+       <button class="part-btn" data-model="Beam_2.glb">Beam_2</button>
       <button class="part-btn" data-model="Beam_3.glb">Beam_3</button>
       <button class="part-btn" data-model="Beam_5.glb">Beam_5</button>
       <button class="part-btn" data-model="Beam_7.glb">Beam_7</button>
       <button class="part-btn" data-model="Beam_9.glb">Beam_9</button>
       <button class="part-btn" data-model="Beam_11.glb">Beam_11</button>
       <button class="part-btn" data-model="Beam_13.glb">Beam_13</button>
-      <button class="part-btn" data-model="Beam_15.glb">Beam_15</button>
+      <button class="part-btn" data-model="Beam_15.glb">Beam_15</button>      
       <button class="part-btn" data-model="Wheel_24mm.glb">Wheel_24mm</button>
       <button class="part-btn" data-model="Wheel_30mm.glb">Wheel_30mm</button>
       <button class="part-btn" data-model="4x4_Angled_Beam.glb">4x4_Angled_Beam</button>
-      <button class="part-btn" data-model="2x4_L_Shaped_Beam.glb">2x4_L_Shaped_Beam</button>
+      <button class="part-btn" data-model="2x4_L_beam.glb">2x4_L_beam</button>
       <button class="part-btn" data-model="7x3_Angled_Beam.glb">7x3_Angled_Beam</button>
       <button class="part-btn" data-model="7x3x3_Angled_Beam_With_Axle_Hole.glb">7x3x3_Angled_Beam_With_Axle_Hole</button>
       <button class="part-btn" data-model="7x5_Block.glb">7x5_Block</button>
       <button class="part-btn" data-model="10x5_Block.glb">10x5_Block</button>
       <button class="part-btn" data-model="11x5_H_block.glb">11x5_H_block</button>
       <button class="part-btn" data-model="5x11_Technic_Plate.glb">5x11_Technic_Plate</button>
+      <button class="part-btn" data-model="15x5_Block.glb">15x5_Block</button>
+      <button class="part-btn" data-model="7x7_Block.glb">7x7_Block</button>
+      <button class="part-btn" data-model="14x7_Block.glb">14x7_Block</button>
     </div>
      
     <button id="saveBtn" style="position:absolute; top:10px; right:10px; z-index:10; padding:8px 12px; border:none; border-radius:6px; background:#2d89ef; color:white; font-weight:bold; cursor:pointer;">Save JSON</button>
@@ -509,37 +518,41 @@
           return;
         }
 
-        // Save undo state before duplicating
-        const originalObjects = objectsToDuplicate.slice();
+        // Unhighlight original objects before duplication
+        objectsToDuplicate.forEach(obj => {
+          unhighlightObject(obj);
+        });
         
         const duplicatedObjects = [];
         
         objectsToDuplicate.forEach(obj => {
           const duplicated = duplicateObject(obj);
           duplicatedObjects.push(duplicated);
+          // Ensure duplicated object is not highlighted
+          unhighlightObject(duplicated);
         });
         
         // Save undo state for the duplication
         saveUndoState('spawn', duplicatedObjects);
         
-        // Update object count immediately after duplication
-        updateObjectCount();
-        
-        // FIXED: Completely clear all selections and reset state
+        // Completely clear all selections and reset state
         selectedObjects.clear();
         currentGrabbed = null;
         multiSelectionActive = false;
         controls.enabled = true;
         
-        // Don't auto-select duplicated objects - let user select them manually
-        updateSelection(); // This will clear all highlights
+        // Clear all highlights from scene
+        scene.children.forEach(obj => {
+          if (obj !== ground && obj.isGroup) {
+            unhighlightObject(obj);
+          }
+        });
         
-        // Force another object count update to ensure UI is correct
-        setTimeout(() => {
-          updateObjectCount();
-        }, 100);
+        // Update UI
+        updateSelection();
+        updateObjectCount();
         
-        console.log(`Successfully duplicated ${duplicatedObjects.length} objects. All selections cleared.`);
+        console.log(`Successfully duplicated ${duplicatedObjects.length} objects. All selections and highlights cleared.`);
       }
 
       function resolveCollisions(targetObject) {
